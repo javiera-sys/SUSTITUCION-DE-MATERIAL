@@ -3,6 +3,7 @@
  * Procesamiento 100% local con ExcelJS + JSZip
  * 
  * Muestra N° y DESCRIPTION de la fila donde se encuentra cada coincidencia.
+ * Resalta en amarillo los cambios para replicar la vista de Excel.
  */
 
 // ============================================================
@@ -180,6 +181,38 @@ function findMatchWithReplacement(text, search, replacement, options) {
 }
 
 // ============================================================
+// RESALTAR PARTES DEL TEXTO
+// ============================================================
+/**
+ * Genera HTML con las coincidencias resaltadas.
+ * @param {string} text - Texto completo
+ * @param {string} search - Texto a resaltar
+ * @param {boolean} caseSensitive - Si distingue mayúsculas
+ * @param {string} cssClass - Clase CSS a aplicar al match
+ */
+function highlightText(text, search, caseSensitive, cssClass) {
+  if (!search) return escapeHtml(text);
+  const regex = new RegExp(escapeRegex(search), caseSensitive ? 'g' : 'gi');
+  // Dividir el texto en partes: antes, match, después
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  const regexGlobal = new RegExp(escapeRegex(search), caseSensitive ? 'g' : 'gi');
+  while ((match = regexGlobal.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(escapeHtml(text.substring(lastIndex, match.index)));
+    }
+    parts.push(`<span class="${cssClass}">${escapeHtml(match[0])}</span>`);
+    lastIndex = match.index + match[0].length;
+    if (match[0].length === 0) regexGlobal.lastIndex++; // evitar loop infinito
+  }
+  if (lastIndex < text.length) {
+    parts.push(escapeHtml(text.substring(lastIndex)));
+  }
+  return parts.join('');
+}
+
+// ============================================================
 // ANÁLISIS
 // ============================================================
 async function analyzeFiles() {
@@ -277,6 +310,7 @@ function renderPreview(results) {
 
   const totalChanges = results.reduce((sum, r) => sum + r.totalChanges, 0);
   const filesWithChanges = results.filter(r => r.totalChanges > 0);
+  const caseSensitive = caseSensitiveCheck.checked;
 
   let html = `<p style="margin-bottom:1rem;font-size:0.85rem;color:#64748b">
     Se encontraron <strong>${totalChanges}</strong> coincidencia(s) en
@@ -308,7 +342,16 @@ function renderPreview(results) {
       </div>`;
 
     r.changes.forEach(c => {
-      html += `<div class="preview-change-block">
+      // Texto original con la coincidencia resaltada en amarillo
+      const originalHtml = highlightText(
+        c.original, c.ruleSearch, caseSensitive, 'hl-yellow'
+      );
+      // Texto nuevo con la sustitución resaltada en amarillo
+      const replacedHtml = highlightText(
+        c.replaced, c.ruleReplace, caseSensitive, 'hl-yellow'
+      );
+
+      html += `<div class="preview-change-block preview-highlighted">
         <div class="preview-row-info">
           <span class="badge-item">N° ${escapeHtml(c.itemNum || '—')}</span>
           <span class="item-desc">${escapeHtml(c.itemDesc || '(sin descripción)')}</span>
@@ -321,11 +364,11 @@ function renderPreview(results) {
         <div class="preview-texts">
           <div class="preview-text-row">
             <span class="preview-label label-old">Contenido actual de la celda:</span>
-            <div class="preview-value value-old">${escapeHtml(c.original)}</div>
+            <div class="preview-value value-old">${originalHtml}</div>
           </div>
           <div class="preview-text-row">
             <span class="preview-label label-new">Contenido después de la sustitución:</span>
-            <div class="preview-value value-new">${escapeHtml(c.replaced)}</div>
+            <div class="preview-value value-new">${replacedHtml}</div>
           </div>
         </div>
       </div>`;
