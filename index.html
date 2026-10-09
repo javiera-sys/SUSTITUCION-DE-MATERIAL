@@ -1,106 +1,1500 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sustituidor de Materiales Excel</title>
-  <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sustituidor de Materiales + Generador Multi-Copias Excel</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- ExcelJS (Sustituidor) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+
+    <!-- SheetJS (Generador - lectura de nombres) -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+
+    <!-- JSZip (Generador - modo ZIP fallback) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#10b981',
+                        primary_hover: '#059669',
+                        secondary: '#3b82f6',
+                        dark: '#1e293b'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* ============ ESTILOS GEN2 (Generador Multi-Copias) ============ */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .drag-over { border-color: #10b981 !important; background-color: #ecfdf5 !important; }
+
+        /* ============ ESTILOS SUSTITUIDOR (adaptados a Tailwind) ============ */
+        .sst .panel {
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .sst .panel h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .sst .upload-zone {
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .sst .upload-zone.dragover { border-color: #10b981; background: #ecfdf5; }
+        .sst .hint { font-size: 0.75rem; color: #64748b; margin-top: 0.75rem; }
+
+        .sst .btn {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+        .sst .btn:active { transform: scale(0.98); }
+        .sst .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .sst .btn-primary { background: #10b981; color: white; }
+        .sst .btn-primary:hover:not(:disabled) { background: #059669; }
+        .sst .btn-secondary { background: #e2e8f0; color: #1e293b; }
+        .sst .btn-secondary:hover:not(:disabled) { background: #cbd5e1; }
+        .sst .btn-success { background: #10b981; color: white; }
+        .sst .btn-success:hover:not(:disabled) { background: #047857; }
+        .sst .btn-large { padding: 0.75rem 2rem; font-size: 0.95rem; }
+        .sst .btn-small { padding: 0.35rem 0.75rem; font-size: 0.78rem; }
+
+        .sst .file-list { list-style: none; margin-top: 1rem; padding: 0; }
+        .sst .file-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 0.85rem;
+        }
+        .sst .file-list li:last-child { border-bottom: none; }
+        .sst .remove-file {
+            background: none; border: none; color: #dc2626;
+            cursor: pointer; font-size: 1.1rem; padding: 0 0.25rem;
+        }
+
+        .sst .catalog-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 0.6rem 0.85rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        .sst .catalog-info { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+        .sst .catalog-badge {
+            background: #10b981; color: white; padding: 0.2rem 0.6rem;
+            border-radius: 12px; font-size: 0.72rem; font-weight: 700;
+        }
+        .sst .catalog-hint { font-size: 0.75rem; color: #64748b; }
+        .sst .catalog-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+        .sst .rule-input-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .sst .rule-input-group input {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            width: 100%;
+        }
+        .sst .rule-input-group input:focus {
+            outline: none; border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16,185,129,0.1);
+        }
+        .sst .rule-options { display: flex; gap: 1.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .sst .checkbox-label {
+            display: flex; align-items: center; gap: 0.35rem;
+            font-size: 0.8rem; color: #64748b; cursor: pointer;
+        }
+
+        .sst .rules-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .sst .rules-table th {
+            text-align: left; padding: 0.5rem; background: #f8fafc;
+            border-bottom: 2px solid #e2e8f0; font-weight: 600;
+            color: #64748b; font-size: 0.75rem; text-transform: uppercase;
+        }
+        .sst .rules-table td {
+            padding: 0.5rem; border-bottom: 1px solid #e2e8f0;
+            word-break: break-word;
+        }
+        .sst .empty-rules { text-align: center; color: #64748b; padding: 1.5rem; font-size: 0.85rem; }
+
+        .sst .action-buttons { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+
+        .sst .progress-bar {
+            margin-top: 1rem; background: #e2e8f0; border-radius: 20px;
+            height: 24px; position: relative; overflow: hidden;
+        }
+        .sst .progress-fill {
+            height: 100%; background: #10b981; width: 0%;
+            transition: width 0.3s; border-radius: 20px;
+        }
+        .sst .progress-text {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 0.75rem; font-weight: 600; color: #1e293b;
+        }
+
+        .sst .preview-file { margin-bottom: 1rem; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; }
+        .sst .preview-file-header {
+            background: #f8fafc; padding: 0.5rem 0.75rem;
+            font-size: 0.85rem; font-weight: 600; border-bottom: 1px solid #e2e8f0;
+        }
+        .sst .preview-change-block { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; }
+        .sst .preview-change-block:last-child { border-bottom: none; }
+
+        .sst .preview-row-info {
+            display: flex; align-items: center; gap: 0.6rem;
+            margin-bottom: 0.6rem; padding: 0.5rem 0.75rem;
+            background: #f1f5f9; border-left: 4px solid #10b981;
+            border-radius: 4px; flex-wrap: wrap;
+        }
+        .sst .badge-item {
+            background: #10b981; color: white; padding: 0.2rem 0.6rem;
+            border-radius: 4px; font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+        }
+        .sst .item-desc {
+            font-size: 0.85rem; font-weight: 600; color: #1e293b; word-break: break-word;
+        }
+
+        .sst .preview-cell-ref {
+            display: flex; gap: 0.5rem; align-items: center;
+            flex-wrap: wrap; margin-bottom: 0.6rem;
+        }
+        .sst .badge-sheet {
+            background: #dbeafe; color: #1e40af; padding: 0.15rem 0.5rem;
+            border-radius: 4px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+        }
+        .sst .badge-cell {
+            background: #fef3c7; color: #92400e; padding: 0.15rem 0.5rem;
+            border-radius: 4px; font-size: 0.7rem; font-weight: 700;
+        }
+        .sst .badge-rule { font-size: 0.7rem; color: #64748b; font-style: italic; }
+
+        .sst .preview-texts { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+        @media (max-width: 640px) { .sst .preview-texts { grid-template-columns: 1fr; } }
+        .sst .preview-text-row { display: flex; flex-direction: column; gap: 0.25rem; }
+        .sst .preview-label {
+            font-size: 0.65rem; font-weight: 700;
+            letter-spacing: 0.05em; text-transform: uppercase;
+        }
+        .sst .label-old { color: #dc2626; }
+        .sst .label-new { color: #059669; }
+        .sst .preview-value {
+            padding: 0.6rem 0.75rem; border-radius: 6px;
+            font-size: 0.8rem; font-family: 'Consolas', 'Monaco', monospace;
+            word-break: break-word; white-space: pre-wrap; line-height: 1.4;
+        }
+        .sst .value-old { background: #fef2f2; border: 1px solid #fecaca; color: #7f1d1d; }
+        .sst .value-new { background: #ecfdf5; border: 1px solid #a7f3d0; color: #064e3b; }
+
+        .sst .result-card {
+            padding: 0.75rem 1rem; border-radius: 6px;
+            margin-bottom: 0.5rem; font-size: 0.85rem;
+        }
+        .sst .result-card.success { background: #ecfdf5; border-left: 4px solid #10b981; }
+        .sst .result-card.warning { background: #fffbeb; border-left: 4px solid #f59e0b; }
+        .sst .result-card.error { background: #fef2f2; border-left: 4px solid #dc2626; }
+        .sst .result-stats {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.75rem; margin-bottom: 1rem;
+        }
+        .sst .stat-box {
+            background: #f8fafc; border-radius: 6px; padding: 0.75rem; text-align: center;
+        }
+        .sst .stat-box .stat-value { font-size: 1.5rem; font-weight: 700; color: #10b981; }
+        .sst .stat-box .stat-label {
+            font-size: 0.7rem; color: #64748b;
+            text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .sst .download-buttons { display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; }
+
+        @media (max-width: 640px) {
+            .sst .rule-input-group { grid-template-columns: 1fr; }
+            .sst .action-buttons { flex-direction: column; }
+            .sst .btn-large { width: 100%; }
+            .sst .catalog-bar { flex-direction: column; align-items: stretch; }
+            .sst .catalog-actions { justify-content: flex-end; }
+        }
+    </style>
 </head>
-<body>
-  <header class="app-header">
-    <h1>SUSTITUIDOR DE MATERIALES EXCEL</h1>
-    <p class="subtitle">Herramienta local para reemplazar nombres de materiales preservando el formato original</p>
-  </header>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
 
-  <main class="app-container">
-    <section class="panel" id="section-upload">
-      <h2>1. Cargar Archivos Excel</h2>
-      <div class="upload-zone" id="dropZone">
-        <p>Arrastra archivos <strong>.xlsx</strong> aquí o</p>
-        <label for="fileInput" class="btn btn-secondary">Seleccionar Archivos</label>
-        <input type="file" id="fileInput" accept=".xlsx,.xls" multiple hidden>
-        <p class="hint">Solo .xlsx con preservación completa de formato. Los archivos .xls deben convertirse primero a .xlsx en Excel.</p>
-      </div>
-      <ul id="fileList" class="file-list"></ul>
-    </section>
+    <!-- Contenedor de Notificaciones (Toasts) -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
 
-    <section class="panel" id="section-rules">
-      <h2>2. Reglas de Sustitución</h2>
-
-      <!-- Catálogo de materiales -->
-      <div class="catalog-bar">
-        <div class="catalog-info">
-          <span class="catalog-badge" id="catalogCount">40 materiales</span>
-          <span class="catalog-hint">Catálogo activo para autocompletado</span>
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-slate-200">
+        <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-primary text-white p-2 rounded-lg">
+                    <i class="fa-solid fa-file-excel text-xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-dark">Suite Excel</h1>
+            </div>
+            <div class="text-sm text-slate-500 hidden sm:flex items-center gap-2">
+                <span><i class="fa-solid fa-shield-halved text-primary mr-1"></i> Procesamiento 100% local</span>
+            </div>
         </div>
-        <div class="catalog-actions">
-          <label for="catalogInput" class="btn btn-secondary btn-small">📥 Importar</label>
-          <input type="file" id="catalogInput" accept=".xlsx" hidden>
-          <button id="exportCatalogBtn" class="btn btn-secondary btn-small" title="Descargar el catálogo actual como .xlsx">📤 Exportar</button>
-          <button id="copyCatalogBtn" class="btn btn-secondary btn-small" title="Copiar el catálogo como código JavaScript para pegar en script.js">📋 Copiar como código</button>
-          <button id="resetCatalogBtn" class="btn btn-secondary btn-small" title="Restaurar catálogo por defecto">↺ Restablecer</button>
+
+        <!-- Pestañas principales -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <nav class="flex gap-1 -mb-px overflow-x-auto">
+                <button class="main-tab-btn px-4 py-3 text-sm font-semibold border-b-2 border-primary text-primary whitespace-nowrap flex items-center gap-2" data-target="app-sustituidor">
+                    <i class="fa-solid fa-arrows-rotate"></i> Sustituidor de Materiales
+                </button>
+                <button class="main-tab-btn px-4 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap flex items-center gap-2" data-target="app-generador">
+                    <i class="fa-solid fa-copy"></i> Generador Multi-Copias
+                </button>
+            </nav>
         </div>
-      </div>
+    </header>
 
-      <div class="rule-input-group">
-        <input type="text" id="searchInput" list="materialList" placeholder="Material a buscar (ej: TRIPLAY OKUME 4MM)" autocomplete="off">
-        <input type="text" id="replaceInput" list="materialList" placeholder="Sustituir por (ej: TRIPLAY PINO 4MM)" autocomplete="off">
-        <button id="addRuleBtn" class="btn btn-primary">Agregar Regla</button>
-      </div>
+    <!-- ============================================================ -->
+    <!-- APP 1: SUSTITUIDOR DE MATERIALES                            -->
+    <!-- ============================================================ -->
+    <main id="app-sustituidor" class="main-tab-content flex-1 w-full">
+        <div class="sst max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
 
-      <!-- Datalist con todos los materiales -->
-      <datalist id="materialList"></datalist>
+            <section class="panel" id="section-upload">
+                <h2><span class="bg-slate-100 text-slate-600 rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold">1</span> Cargar Archivos Excel</h2>
+                <div class="upload-zone" id="dropZone">
+                    <p>Arrastra archivos <strong>.xlsx</strong> aquí o</p>
+                    <label for="fileInput" class="btn btn-secondary">Seleccionar Archivos</label>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls" multiple hidden>
+                    <p class="hint">Solo .xlsx con preservación completa de formato. Los archivos .xls deben convertirse primero a .xlsx en Excel.</p>
+                </div>
+                <ul id="fileList" class="file-list"></ul>
+            </section>
 
-      <div class="rule-options">
-        <label class="checkbox-label">
-          <input type="checkbox" id="caseSensitive"> Distinguir mayúsculas/minúsculas
-        </label>
-        <label class="checkbox-label">
-          <input type="checkbox" id="exactMatch"> Solo coincidencia exacta de celda completa
-        </label>
-      </div>
-      <table class="rules-table">
-        <thead>
-          <tr><th>Buscar</th><th>Sustituir por</th><th>Acción</th></tr>
-        </thead>
-        <tbody id="rulesBody"></tbody>
-      </table>
-    </section>
+            <section class="panel" id="section-rules">
+                <h2><span class="bg-slate-100 text-slate-600 rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold">2</span> Reglas de Sustitución</h2>
 
-    <section class="panel" id="section-actions">
-      <h2>3. Procesar</h2>
-      <div class="action-buttons">
-        <button id="analyzeBtn" class="btn btn-primary btn-large" disabled>ANALIZAR ARCHIVOS</button>
-        <button id="applyBtn" class="btn btn-success btn-large" disabled>APLICAR SUSTITUCIONES</button>
-      </div>
-      <div class="progress-bar hidden" id="progressBar">
-        <div class="progress-fill" id="progressFill"></div>
-        <span class="progress-text" id="progressText"></span>
-      </div>
-    </section>
+                <div class="catalog-bar">
+                    <div class="catalog-info">
+                        <span class="catalog-badge" id="catalogCount">40 materiales</span>
+                        <span class="catalog-hint">Catálogo activo para autocompletado</span>
+                    </div>
+                    <div class="catalog-actions">
+                        <label for="catalogInput" class="btn btn-secondary btn-small">📥 Importar</label>
+                        <input type="file" id="catalogInput" accept=".xlsx" hidden>
+                        <button id="exportCatalogBtn" class="btn btn-secondary btn-small" title="Descargar el catálogo actual como .xlsx">📤 Exportar</button>
+                        <button id="copyCatalogBtn" class="btn btn-secondary btn-small" title="Copiar el catálogo como código JavaScript">📋 Copiar como código</button>
+                        <button id="resetCatalogBtn" class="btn btn-secondary btn-small" title="Restaurar catálogo por defecto">↺ Restablecer</button>
+                    </div>
+                </div>
 
-    <section class="panel hidden" id="section-preview">
-      <h2>Vista Previa de Cambios</h2>
-      <div id="previewContent"></div>
-    </section>
+                <div class="rule-input-group">
+                    <input type="text" id="searchInput" list="materialList" placeholder="Material a buscar (ej: TRIPLAY OKUME 4MM)" autocomplete="off">
+                    <input type="text" id="replaceInput" list="materialList" placeholder="Sustituir por (ej: TRIPLAY PINO 4MM)" autocomplete="off">
+                    <button id="addRuleBtn" class="btn btn-primary">Agregar Regla</button>
+                </div>
 
-    <section class="panel hidden" id="section-results">
-      <h2>Resultados</h2>
-      <div id="resultsSummary"></div>
-      <div id="resultsDetails"></div>
-      <div class="download-buttons">
-        <button id="downloadFolderBtn" class="btn btn-primary" disabled>GUARDAR EN CARPETA...</button>
-        <button id="downloadIndividualBtn" class="btn btn-secondary" disabled>DESCARGAR UNO POR UNO</button>
-        <button id="downloadReportBtn" class="btn btn-secondary" disabled>DESCARGAR REPORTE (TXT)</button>
-      </div>
-    </section>
-  </main>
+                <datalist id="materialList"></datalist>
 
-  <footer class="app-footer">
-    <p>Procesamiento 100% local · Los archivos nunca salen de tu navegador</p>
-  </footer>
+                <div class="rule-options">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="caseSensitive"> Distinguir mayúsculas/minúsculas
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="exactMatch"> Solo coincidencia exacta de celda completa
+                    </label>
+                </div>
+                <table class="rules-table">
+                    <thead>
+                        <tr><th>Buscar</th><th>Sustituir por</th><th>Acción</th></tr>
+                    </thead>
+                    <tbody id="rulesBody"></tbody>
+                </table>
+            </section>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
-  <script src="script.js"></script>
+            <section class="panel" id="section-actions">
+                <h2><span class="bg-slate-100 text-slate-600 rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold">3</span> Procesar</h2>
+                <div class="action-buttons">
+                    <button id="analyzeBtn" class="btn btn-primary btn-large" disabled>ANALIZAR ARCHIVOS</button>
+                    <button id="applyBtn" class="btn btn-success btn-large" disabled>APLICAR SUSTITUCIONES</button>
+                </div>
+                <div class="progress-bar hidden" id="progressBar">
+                    <div class="progress-fill" id="progressFill"></div>
+                    <span class="progress-text" id="progressText"></span>
+                </div>
+            </section>
+
+            <section class="panel hidden" id="section-preview">
+                <h2>Vista Previa de Cambios</h2>
+                <div id="previewContent"></div>
+            </section>
+
+            <section class="panel hidden" id="section-results">
+                <h2>Resultados</h2>
+                <div id="resultsSummary"></div>
+                <div id="resultsDetails"></div>
+                <div class="download-buttons">
+                    <button id="downloadFolderBtn" class="btn btn-primary" disabled>GUARDAR EN CARPETA...</button>
+                    <button id="downloadIndividualBtn" class="btn btn-secondary" disabled>DESCARGAR UNO POR UNO</button>
+                    <button id="downloadReportBtn" class="btn btn-secondary" disabled>DESCARGAR REPORTE (TXT)</button>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- ============================================================ -->
+    <!-- APP 2: GENERADOR MULTI-COPIAS                                -->
+    <!-- ============================================================ -->
+    <main id="app-generador" class="main-tab-content hidden flex-1 w-full">
+        <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full">
+
+                <!-- Panel Izquierdo -->
+                <div class="lg:col-span-5 space-y-6">
+
+                    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                        <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <span class="bg-slate-100 text-slate-600 rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold">1</span>
+                            Importar Archivo Base
+                        </h2>
+                        <p class="text-sm text-slate-500 mb-4">Selecciona el archivo Excel original. Se conservará absolutamente intacto.</p>
+
+                        <div id="drop-zone-base" class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:bg-slate-50 transition-colors relative">
+                            <input type="file" id="base-file-input" accept=".xlsx, .xls, .xlsm" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                            <div id="base-file-display" class="pointer-events-none">
+                                <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 mb-2"></i>
+                                <p class="text-sm font-medium text-slate-700">Haz clic o arrastra tu archivo aquí</p>
+                                <p class="text-xs text-slate-400 mt-1">Soporta .xlsx, .xls, .xlsm</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                        <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <span class="bg-slate-100 text-slate-600 rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold">2</span>
+                            Agregar Nombres
+                        </h2>
+
+                        <div class="flex border-b border-slate-200 mb-4">
+                            <button class="tab-btn flex-1 py-2 text-sm font-medium border-b-2 border-primary text-primary" data-target="tab-manual">
+                                <i class="fa-solid fa-keyboard mr-2"></i>Escribir / Pegar
+                            </button>
+                            <button class="tab-btn flex-1 py-2 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700" data-target="tab-file">
+                                <i class="fa-solid fa-file-import mr-2"></i>Cargar Archivo
+                            </button>
+                        </div>
+
+                        <div id="tab-manual" class="tab-content block">
+                            <p class="text-xs text-slate-500 mb-2">Pega una columna desde Excel o escribe un nombre por línea.</p>
+                            <textarea id="names-textarea" rows="5" class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow resize-none" placeholder="MESA-001&#10;MESA-002&#10;MESA-003"></textarea>
+                            <button id="add-names-btn" class="mt-3 w-full bg-slate-800 hover:bg-slate-900 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-plus"></i> Agregar a la lista
+                            </button>
+                        </div>
+
+                        <div id="tab-file" class="tab-content hidden">
+                            <p class="text-xs text-slate-500 mb-3">Carga un .txt, .csv o .xlsx. Se extraerán los nombres de la primera columna.</p>
+                            <div class="relative border border-slate-300 rounded-lg p-3 flex items-center justify-center bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors">
+                                <input type="file" id="names-file-input" accept=".txt, .csv, .xlsx, .xls" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                                <div class="text-center pointer-events-none">
+                                    <i class="fa-solid fa-file-csv text-xl text-slate-600 mb-1"></i>
+                                    <span class="block text-sm font-medium text-slate-700">Seleccionar archivo de nombres</span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Panel Derecho -->
+                <div class="lg:col-span-7 flex flex-col h-[calc(100vh-12rem)] min-h-[600px]">
+                    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex-1 flex flex-col">
+
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-lg font-semibold flex items-center gap-2">
+                                <i class="fa-solid fa-list-check text-secondary"></i> Lista de Nombres
+                            </h2>
+                            <div class="flex items-center gap-3">
+                                <span class="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-sm font-medium">
+                                    Total: <span id="total-count">0</span>
+                                </span>
+                                <button id="clear-all-btn" class="text-red-500 hover:text-red-700 text-sm font-medium px-2 py-1 transition-colors" title="Limpiar lista completa">
+                                    <i class="fa-solid fa-trash-can mr-1"></i> Limpiar
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="duplicate-warning" class="hidden bg-amber-50 border-l-4 border-amber-400 p-3 mb-4 rounded-r-lg flex justify-between items-center">
+                            <div class="flex items-center">
+                                <i class="fa-solid fa-triangle-exclamation text-amber-500 mr-2"></i>
+                                <span class="text-sm text-amber-800">Se detectaron nombres duplicados.</span>
+                            </div>
+                            <button id="remove-duplicates-btn" class="text-xs bg-amber-100 hover:bg-amber-200 text-amber-800 px-3 py-1 rounded transition-colors font-medium">
+                                Quitar duplicados
+                            </button>
+                        </div>
+
+                        <div class="flex-1 border border-slate-200 rounded-lg bg-slate-50 p-2 overflow-hidden flex flex-col">
+                            <div id="empty-state" class="flex-1 flex flex-col items-center justify-center text-slate-400">
+                                <i class="fa-solid fa-clipboard-list text-4xl mb-3"></i>
+                                <p class="text-sm">La lista está vacía</p>
+                            </div>
+                            <ul id="names-list" class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-1 hidden"></ul>
+                        </div>
+
+                        <div class="mt-6 pt-6 border-t border-slate-100">
+                            <button id="generate-btn" class="w-full bg-primary hover:bg-primary_hover text-white text-lg font-bold py-4 px-6 rounded-xl shadow-md transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                                <i class="fa-solid fa-folder-open text-xl"></i>
+                                <span id="generate-btn-text">ELEGIR CARPETA Y GENERAR ARCHIVOS</span>
+                            </button>
+                            <p id="generate-hint" class="text-center text-xs text-slate-500 mt-3">
+                                El navegador te pedirá elegir una carpeta donde guardar todos los archivos.
+                            </p>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ============================================================ -->
+    <!-- SCRIPTS                                                      -->
+    <!-- ============================================================ -->
+
+    <!-- SCRIPT: Cambio de pestañas principales -->
+    <script>
+        document.querySelectorAll('.main-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.main-tab-btn').forEach(b => {
+                    b.classList.remove('border-primary', 'text-primary');
+                    b.classList.add('border-transparent', 'text-slate-500');
+                });
+                document.querySelectorAll('.main-tab-content').forEach(c => c.classList.add('hidden'));
+                btn.classList.add('border-primary', 'text-primary');
+                btn.classList.remove('border-transparent', 'text-slate-500');
+                document.getElementById(btn.dataset.target).classList.remove('hidden');
+            });
+        });
+    </script>
+
+    <!-- ============================================================ -->
+    <!-- SCRIPT: APP SUSTITUIDOR                                      -->
+    <!-- ============================================================ -->
+    <script>
+    (function() {
+        // ---------- CATÁLOGO POR DEFECTO ----------
+        const DEFAULT_CATALOG = [
+            { num: 1,  material: 'TRIPLAY OKUME 15MM',         tipo: 'HOJA', detalles: '' },
+            { num: 2,  material: 'TRIPLAY OKUME 12MM',         tipo: 'HOJA', detalles: '' },
+            { num: 3,  material: 'TRIPLAY OKUME 4MM',          tipo: 'HOJA', detalles: '' },
+            { num: 4,  material: 'TRIPLAY PINO 4MM',           tipo: 'HOJA', detalles: 'NUEVO' },
+            { num: 5,  material: 'MULTIPLAY PINO 18MM',        tipo: 'HOJA', detalles: '' },
+            { num: 6,  material: 'MULTIPLAY PINO 9MM',         tipo: 'HOJA', detalles: '' },
+            { num: 7,  material: 'MDF 15MM',                   tipo: 'HOJA', detalles: '' },
+            { num: 8,  material: 'MDF 17MM',                   tipo: 'HOJA', detalles: '' },
+            { num: 9,  material: 'MDF 19MM',                   tipo: 'HOJA', detalles: '' },
+            { num: 10, material: 'MDF 3MM',                    tipo: 'HOJA', detalles: '' },
+            { num: 11, material: 'CIMBRA 15MM',                tipo: 'HOJA', detalles: '' },
+            { num: 12, material: 'TRIPLAY MELINA 13MM',        tipo: 'HOJA', detalles: '' },
+            { num: 13, material: 'TRIPLAY MELINA 18MM',        tipo: 'HOJA', detalles: '' },
+            { num: 14, material: 'TRIPLAY MELINA 9MM',         tipo: 'HOJA', detalles: '' },
+            { num: 15, material: 'TRIPLAY MELINA FLEX 4MM',    tipo: 'HOJA', detalles: '' },
+            { num: 16, material: 'TRIPLAY TECA CAFE 12MM',     tipo: 'HOJA', detalles: 'CAMBIO A 13MM' },
+            { num: 17, material: 'TRIPLAY TECA CAFE 18MM',     tipo: 'HOJA', detalles: '' },
+            { num: 18, material: 'TRIPLAY TECA CAFE 9MM',      tipo: 'HOJA', detalles: '' },
+            { num: 19, material: 'TRIPLAY TECA CAFE FLEX 4MM', tipo: 'HOJA', detalles: '' },
+            { num: 20, material: 'TRIPLAY TECA PINTA 12MM',    tipo: 'HOJA', detalles: 'CAMBIO A 13MM' },
+            { num: 21, material: 'TRIPLAY TECA PINTA 18MM',    tipo: 'HOJA', detalles: '' },
+            { num: 22, material: 'TRIPLAY TECA PINTA 9MM',     tipo: 'HOJA', detalles: '' },
+            { num: 23, material: 'TRIPLAY TECA PINTA FLEX 4MM', tipo: 'HOJA', detalles: '' },
+            { num: 24, material: 'TRIPLAY NOGAL 12MM',         tipo: 'HOJA', detalles: '' },
+            { num: 25, material: 'TRIPLAY NOGAL 18MM',         tipo: 'HOJA', detalles: '' },
+            { num: 26, material: 'TRIPLAY NOGAL 9MM',          tipo: 'HOJA', detalles: '' },
+            { num: 27, material: 'TRIPLAY ROSA MORADA 9MM',    tipo: 'HOJA', detalles: '' },
+            { num: 28, material: 'TRIPLAY PAROTA 12MM',        tipo: 'HOJA', detalles: '' },
+            { num: 29, material: 'MANGO',                      tipo: 'PT',   detalles: '' },
+            { num: 30, material: 'PINO',                       tipo: 'PT',   detalles: '' },
+            { num: 31, material: 'POPLAR',                     tipo: 'PT',   detalles: '' },
+            { num: 32, material: 'HULE',                       tipo: 'PT',   detalles: '' },
+            { num: 33, material: 'HABILLO',                    tipo: 'PT',   detalles: '' },
+            { num: 34, material: 'MELINA',                     tipo: 'PT',   detalles: '' },
+            { num: 35, material: 'REC. NO PAROTA',             tipo: 'PT',   detalles: '' },
+            { num: 36, material: 'RECUPERACION',               tipo: 'PT',   detalles: '' },
+            { num: 37, material: 'REC. MANGO',                 tipo: 'PT',   detalles: '' },
+            { num: 38, material: 'REC. PINO',                  tipo: 'PT',   detalles: '' },
+            { num: 39, material: 'REC. MELINA',                tipo: 'PT',   detalles: '' },
+            { num: 40, material: 'MULTIMADERA',                tipo: 'PT',   detalles: 'DESCRIBIR QUE MATERIAL SON' }
+        ];
+
+        const STORAGE_KEY = 'sustituidor_catalogo_materiales_v1';
+
+        const state = {
+            files: [],
+            rules: [],
+            catalog: [],
+            previewResults: null,
+            processedResults: null,
+            fileIdCounter: 0,
+            ruleIdCounter: 0
+        };
+
+        const $ = (sel) => document.querySelector(sel);
+        const fileInput = $('#fileInput');
+        const dropZone = $('#dropZone');
+        const fileList = $('#fileList');
+        const searchInput = $('#searchInput');
+        const replaceInput = $('#replaceInput');
+        const materialList = $('#materialList');
+        const addRuleBtn = $('#addRuleBtn');
+        const caseSensitiveCheck = $('#caseSensitive');
+        const exactMatchCheck = $('#exactMatch');
+        const rulesBody = $('#rulesBody');
+        const analyzeBtn = $('#analyzeBtn');
+        const applyBtn = $('#applyBtn');
+        const progressBar = $('#progressBar');
+        const progressFill = $('#progressFill');
+        const progressText = $('#progressText');
+        const sectionPreview = $('#section-preview');
+        const previewContent = $('#previewContent');
+        const sectionResults = $('#section-results');
+        const resultsSummary = $('#resultsSummary');
+        const resultsDetails = $('#resultsDetails');
+        const downloadFolderBtn = $('#downloadFolderBtn');
+        const downloadIndividualBtn = $('#downloadIndividualBtn');
+        const downloadReportBtn = $('#downloadReportBtn');
+        const catalogInput = $('#catalogInput');
+        const catalogCount = $('#catalogCount');
+        const resetCatalogBtn = $('#resetCatalogBtn');
+        const exportCatalogBtn = $('#exportCatalogBtn');
+        const copyCatalogBtn = $('#copyCatalogBtn');
+
+        // ---------- CATÁLOGO ----------
+        function loadCatalog() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        state.catalog = parsed;
+                        return;
+                    }
+                }
+            } catch (e) { console.warn(e); }
+            state.catalog = DEFAULT_CATALOG.map(m => ({ ...m }));
+        }
+        function saveCatalog() {
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.catalog)); }
+            catch (e) { console.warn(e); }
+        }
+        function renderCatalogDatalist() {
+            const items = [...state.catalog].sort((a, b) => a.material.localeCompare(b.material, 'es'));
+            materialList.innerHTML = items.map(m =>
+                `<option value="${escapeHtmlAttr(m.material)}">${escapeHtmlAttr(m.tipo || '')}${m.detalles ? ' · ' + escapeHtmlAttr(m.detalles) : ''}</option>`
+            ).join('');
+            catalogCount.textContent = `${state.catalog.length} material${state.catalog.length === 1 ? '' : 'es'}`;
+        }
+        async function importCatalogFromFile(file) {
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const workbook = new ExcelJS.Workbook();
+                await workbook.xlsx.load(arrayBuffer);
+                const worksheet = workbook.worksheets[0];
+                if (!worksheet) throw new Error('El archivo no contiene hojas.');
+                const nuevos = [];
+                let headerSkipped = false;
+                worksheet.eachRow({ includeEmpty: false }, (row) => {
+                    const cA = row.getCell(1).value;
+                    const cB = row.getCell(2).value;
+                    const cC = row.getCell(3).value;
+                    const cD = row.getCell(4).value;
+                    const numStr = cA != null ? String(cA).trim() : '';
+                    const material = cB != null ? String(cB).trim() : '';
+                    const tipo = cC != null ? String(cC).trim() : '';
+                    const detalles = cD != null ? String(cD).trim() : '';
+                    if (!headerSkipped) {
+                        if (/^#?$/.test(numStr) || /material/i.test(material)) { headerSkipped = true; return; }
+                        headerSkipped = true;
+                    }
+                    if (!material) return;
+                    nuevos.push({ num: numStr ? Number(numStr) || numStr : '', material, tipo, detalles });
+                });
+                if (nuevos.length === 0) {
+                    alert('No se encontraron materiales en el archivo.');
+                    return;
+                }
+                const opcion = confirm(
+                    `Se encontraron ${nuevos.length} material(es).\n\nAceptar = REEMPLAZAR catálogo actual.\nCancelar = AGREGAR solo los nuevos.`
+                );
+                if (opcion) {
+                    state.catalog = nuevos;
+                } else {
+                    const existentes = new Set(state.catalog.map(m => m.material.toUpperCase()));
+                    let agregados = 0;
+                    nuevos.forEach(n => {
+                        if (!existentes.has(n.material.toUpperCase())) {
+                            state.catalog.push(n);
+                            existentes.add(n.material.toUpperCase());
+                            agregados++;
+                        }
+                    });
+                    alert(`${agregados} material(es) nuevo(s) agregado(s).`);
+                }
+                saveCatalog();
+                renderCatalogDatalist();
+            } catch (err) {
+                console.error(err);
+                alert('Error al importar el catálogo: ' + (err.message || err));
+            }
+        }
+        function resetCatalog() {
+            if (!confirm('¿Restablecer el catálogo al listado original?')) return;
+            state.catalog = DEFAULT_CATALOG.map(m => ({ ...m }));
+            saveCatalog();
+            renderCatalogDatalist();
+        }
+        async function exportCatalog() {
+            try {
+                const workbook = new ExcelJS.Workbook();
+                const sheet = workbook.addWorksheet('Hoja1');
+                sheet.columns = [
+                    { header: '#',        key: 'num',      width: 6 },
+                    { header: 'MATERIAL', key: 'material', width: 32 },
+                    { header: 'TIPO',     key: 'tipo',     width: 10 },
+                    { header: 'DETALLES', key: 'detalles', width: 30 }
+                ];
+                sheet.getRow(1).font = { bold: true };
+                state.catalog.forEach((m, i) => {
+                    sheet.addRow([m.num || (i + 1), m.material || '', m.tipo || '', m.detalles || '']);
+                });
+                const buffer = await workbook.xlsx.writeBuffer();
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                downloadBlob(blob, 'NOMENCLATURA_DE_MATERIALES_ACTUALIZADO.xlsx');
+            } catch (err) {
+                console.error(err);
+                alert('Error al exportar: ' + (err.message || err));
+            }
+        }
+        async function copyCatalogAsCode() {
+            const lines = state.catalog.map((m, i) => {
+                const num = String(m.num || (i + 1)).padStart(2, ' ');
+                const material = `'${String(m.material || '').replace(/'/g, "\\'")}'`.padEnd(45, ' ');
+                const tipo = `'${String(m.tipo || '').replace(/'/g, "\\'")}'`.padEnd(8, ' ');
+                const detalles = `'${String(m.detalles || '').replace(/'/g, "\\'")}'`;
+                return `  { num: ${num}, material: ${material}, tipo: ${tipo}, detalles: ${detalles} }`;
+            });
+            const code = `const DEFAULT_CATALOG = [\n${lines.join(',\n')}\n];`;
+            try {
+                await navigator.clipboard.writeText(code);
+                alert('✅ Catálogo copiado. Pega en DEFAULT_CATALOG de script.js');
+            } catch (err) {
+                const ta = document.createElement('textarea');
+                ta.value = code;
+                ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta); ta.select();
+                try { document.execCommand('copy'); alert('✅ Copiado.'); }
+                catch (e) { prompt('Copia manualmente:', code); }
+                document.body.removeChild(ta);
+            }
+        }
+
+        // ---------- ARCHIVOS ----------
+        function addFiles(files) {
+            const validFiles = Array.from(files).filter(f => f.name.endsWith('.xlsx') || f.name.endsWith('.xls'));
+            validFiles.forEach(file => {
+                if (file.name.endsWith('.xls')) {
+                    alert(`"${file.name}" es .xls. Conviértelo a .xlsx primero.`);
+                    return;
+                }
+                state.files.push({ file, id: `file-${++state.fileIdCounter}` });
+            });
+            renderFileList(); updateButtonStates();
+        }
+        function removeFile(id) {
+            state.files = state.files.filter(f => f.id !== id);
+            renderFileList(); updateButtonStates();
+        }
+        function renderFileList() {
+            if (state.files.length === 0) { fileList.innerHTML = ''; return; }
+            fileList.innerHTML = state.files.map(f => `
+                <li>
+                    <span>${escapeHtml(f.file.name)} <small style="color:#64748b">(${formatSize(f.file.size)})</small></span>
+                    <button class="remove-file" onclick="window.__sst_removeFile('${f.id}')" title="Eliminar">×</button>
+                </li>
+            `).join('');
+        }
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // ---------- REGLAS ----------
+        function addRule() {
+            const search = searchInput.value.trim();
+            const replace = replaceInput.value.trim();
+            if (!search) { alert('El campo "Buscar" no puede estar vacío.'); return; }
+            const exists = state.rules.find(r => r.search.toLowerCase() === search.toLowerCase());
+            if (exists) { alert(`Ya existe una regla para "${search}".`); return; }
+            state.rules.push({ id: `rule-${++state.ruleIdCounter}`, search, replace });
+            searchInput.value = ''; replaceInput.value = '';
+            searchInput.focus();
+            renderRules(); updateButtonStates();
+        }
+        function removeRule(id) {
+            state.rules = state.rules.filter(r => r.id !== id);
+            renderRules(); updateButtonStates();
+        }
+        function renderRules() {
+            if (state.rules.length === 0) {
+                rulesBody.innerHTML = `<tr><td colspan="3" class="empty-rules">No hay reglas definidas. Agrega al menos una.</td></tr>`;
+                return;
+            }
+            rulesBody.innerHTML = state.rules.map(r => `
+                <tr>
+                    <td>${escapeHtml(r.search)}</td>
+                    <td>${escapeHtml(r.replace)}</td>
+                    <td><button onclick="window.__sst_removeRule('${r.id}')" title="Eliminar" style="background:none;border:none;cursor:pointer;font-size:1rem;opacity:0.6;">🗑️</button></td>
+                </tr>
+            `).join('');
+        }
+        function updateButtonStates() {
+            const hasFiles = state.files.length > 0;
+            const hasRules = state.rules.length > 0;
+            analyzeBtn.disabled = !(hasFiles && hasRules);
+            applyBtn.disabled = !state.previewResults;
+        }
+
+        // ---------- LECTURA ----------
+        async function readWorkbook(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const workbook = new ExcelJS.Workbook();
+            await workbook.xlsx.load(arrayBuffer);
+            return workbook;
+        }
+        function escapeRegex(str) { return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+        function findMatchWithReplacement(text, search, replacement, options) {
+            const { caseSensitive, exactMatch } = options;
+            let haystack = text, needle = search;
+            if (!caseSensitive) { haystack = haystack.toLowerCase(); needle = needle.toLowerCase(); }
+            if (exactMatch) {
+                if (haystack === needle) return { matched: true, result: replacement, count: 1 };
+                return { matched: false, result: text, count: 0 };
+            }
+            if (haystack.includes(needle)) {
+                const regex = new RegExp(escapeRegex(search), caseSensitive ? 'g' : 'gi');
+                const count = (text.match(regex) || []).length;
+                return { matched: true, result: text.replace(regex, replacement), count };
+            }
+            return { matched: false, result: text, count: 0 };
+        }
+
+        // ---------- ANÁLISIS ----------
+        async function analyzeFiles() {
+            if (state.files.length === 0 || state.rules.length === 0) return;
+            showProgress('Analizando archivos...', 0);
+            const results = [];
+            const total = state.files.length;
+            for (let i = 0; i < total; i++) {
+                const fileEntry = state.files[i];
+                updateProgress(`Analizando: ${fileEntry.file.name}`, (i / total) * 100);
+                try {
+                    const workbook = await readWorkbook(fileEntry.file);
+                    const changes = analyzeWorkbook(workbook, state.rules, {
+                        caseSensitive: caseSensitiveCheck.checked,
+                        exactMatch: exactMatchCheck.checked
+                    });
+                    results.push({
+                        fileName: fileEntry.file.name,
+                        fileId: fileEntry.id,
+                        changes,
+                        totalChanges: changes.reduce((s, c) => s + c.count, 0),
+                        error: null
+                    });
+                } catch (err) {
+                    results.push({
+                        fileName: fileEntry.file.name, fileId: fileEntry.id,
+                        changes: [], totalChanges: 0,
+                        error: err.message || 'Error al leer el archivo'
+                    });
+                }
+            }
+            updateProgress('Análisis completado', 100);
+            hideProgress();
+            state.previewResults = results;
+            renderPreview(results);
+            updateButtonStates();
+        }
+        function analyzeWorkbook(workbook, rules, options) {
+            const changes = [];
+            workbook.eachSheet((worksheet) => {
+                worksheet.eachRow({ includeEmpty: false }, (row) => {
+                    const rowNum = row.number;
+                    const cellA = worksheet.getCell(`A${rowNum}`);
+                    const cellB = worksheet.getCell(`B${rowNum}`);
+                    const numValue = cellA.value != null ? String(cellA.value).trim() : '';
+                    const descValue = cellB.value != null ? String(cellB.value).trim() : '';
+                    row.eachCell({ includeEmpty: false }, (cell) => {
+                        const cellValue = cell.value;
+                        if (typeof cellValue !== 'string') return;
+                        if (cell.col === 1 || cell.col === 2) return;
+                        for (const rule of rules) {
+                            const m = findMatchWithReplacement(cellValue, rule.search, rule.replace, options);
+                            if (m.matched && m.result !== cellValue) {
+                                changes.push({
+                                    sheet: worksheet.name, cell: cell.address, rowNum,
+                                    itemNum: numValue, itemDesc: descValue,
+                                    original: cellValue, replaced: m.result,
+                                    ruleSearch: rule.search, ruleReplace: rule.replace,
+                                    count: m.count
+                                });
+                                break;
+                            }
+                        }
+                    });
+                });
+            });
+            return changes;
+        }
+
+        // ---------- PREVIEW ----------
+        function renderPreview(results) {
+            sectionPreview.classList.remove('hidden');
+            const totalChanges = results.reduce((s, r) => s + r.totalChanges, 0);
+            const filesWithChanges = results.filter(r => r.totalChanges > 0);
+            let html = `<p style="margin-bottom:1rem;font-size:0.85rem;color:#64748b">
+                Se encontraron <strong>${totalChanges}</strong> coincidencia(s) en
+                <strong>${filesWithChanges.length}</strong> de <strong>${results.length}</strong> archivo(s).
+            </p>`;
+            if (totalChanges === 0) {
+                html += `<div class="result-card warning">No se encontraron coincidencias.</div>`;
+            }
+            results.forEach(r => {
+                if (r.error) {
+                    html += `<div class="result-card error"><strong>${escapeHtml(r.fileName)}</strong> — Error: ${escapeHtml(r.error)}</div>`;
+                    return;
+                }
+                if (r.totalChanges === 0) {
+                    html += `<div class="result-card warning"><strong>${escapeHtml(r.fileName)}</strong> — Sin coincidencias</div>`;
+                    return;
+                }
+                html += `<div class="preview-file">
+                    <div class="preview-file-header">${escapeHtml(r.fileName)} — ${r.totalChanges} cambio(s)</div>`;
+                r.changes.forEach(c => {
+                    html += `<div class="preview-change-block">
+                        <div class="preview-row-info">
+                            <span class="badge-item">N° ${escapeHtml(c.itemNum || '—')}</span>
+                            <span class="item-desc">${escapeHtml(c.itemDesc || '(sin descripción)')}</span>
+                        </div>
+                        <div class="preview-cell-ref">
+                            <span class="badge-sheet">${escapeHtml(c.sheet)}</span>
+                            <span class="badge-cell">${c.cell}</span>
+                            <span class="badge-rule">Regla: "${escapeHtml(c.ruleSearch)}" → "${escapeHtml(c.ruleReplace)}"</span>
+                        </div>
+                        <div class="preview-texts">
+                            <div class="preview-text-row">
+                                <span class="preview-label label-old">Contenido actual:</span>
+                                <div class="preview-value value-old">${escapeHtml(c.original)}</div>
+                            </div>
+                            <div class="preview-text-row">
+                                <span class="preview-label label-new">Después de la sustitución:</span>
+                                <div class="preview-value value-new">${escapeHtml(c.replaced)}</div>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+                html += `</div>`;
+            });
+            html += `<div style="margin-top:1rem"><button id="cancelPreviewBtn" class="btn btn-secondary">Cancelar</button></div>`;
+            previewContent.innerHTML = html;
+            const cancelBtn = document.getElementById('cancelPreviewBtn');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', () => {
+                    sectionPreview.classList.add('hidden');
+                    state.previewResults = null;
+                    updateButtonStates();
+                });
+            }
+        }
+
+        // ---------- APLICAR ----------
+        async function applyReplacements() {
+            if (!state.previewResults) return;
+            showProgress('Aplicando sustituciones...', 0);
+            const results = [];
+            const total = state.files.length;
+            for (let i = 0; i < total; i++) {
+                const fileEntry = state.files[i];
+                updateProgress(`Procesando: ${fileEntry.file.name}`, (i / total) * 100);
+                try {
+                    const workbook = await readWorkbook(fileEntry.file);
+                    const applyResult = applyToWorkbook(workbook, state.rules, {
+                        caseSensitive: caseSensitiveCheck.checked,
+                        exactMatch: exactMatchCheck.checked
+                    });
+                    if (applyResult.totalChanges === 0) {
+                        results.push({
+                            fileName: fileEntry.file.name, status: 'no_changes',
+                            changes: 0, outputName: null, blob: null, error: null, details: []
+                        });
+                        continue;
+                    }
+                    const buffer = await workbook.xlsx.writeBuffer();
+                    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                    const outputName = fileEntry.file.name.replace(/\.xlsx$/i, '_MODIFICADO.xlsx');
+                    results.push({
+                        fileName: fileEntry.file.name, status: 'modified',
+                        changes: applyResult.totalChanges, outputName, blob,
+                        error: null, details: applyResult.details
+                    });
+                } catch (err) {
+                    results.push({
+                        fileName: fileEntry.file.name, status: 'error',
+                        changes: 0, outputName: null, blob: null,
+                        error: err.message || 'Error al procesar', details: []
+                    });
+                }
+            }
+            updateProgress('Procesamiento completado', 100);
+            hideProgress();
+            state.processedResults = results;
+            renderResults(results);
+            sectionPreview.classList.add('hidden');
+        }
+        function applyToWorkbook(workbook, rules, options) {
+            let totalChanges = 0;
+            const details = [];
+            workbook.eachSheet((worksheet) => {
+                worksheet.eachRow({ includeEmpty: false }, (row) => {
+                    const rowNum = row.number;
+                    const cellA = worksheet.getCell(`A${rowNum}`);
+                    const cellB = worksheet.getCell(`B${rowNum}`);
+                    const numValue = cellA.value != null ? String(cellA.value).trim() : '';
+                    const descValue = cellB.value != null ? String(cellB.value).trim() : '';
+                    row.eachCell({ includeEmpty: false }, (cell) => {
+                        const cellValue = cell.value;
+                        if (typeof cellValue !== 'string') return;
+                        if (cell.col === 1 || cell.col === 2) return;
+                        for (const rule of rules) {
+                            const m = findMatchWithReplacement(cellValue, rule.search, rule.replace, options);
+                            if (m.matched && m.result !== cellValue) {
+                                cell.value = m.result;
+                                totalChanges += m.count;
+                                details.push({
+                                    sheet: worksheet.name, cell: cell.address, rowNum,
+                                    itemNum: numValue, itemDesc: descValue,
+                                    original: cellValue, replaced: m.result, rule: rule.search
+                                });
+                                break;
+                            }
+                        }
+                    });
+                });
+            });
+            return { totalChanges, details };
+        }
+
+        // ---------- RESULTADOS ----------
+        function renderResults(results) {
+            sectionResults.classList.remove('hidden');
+            const modified = results.filter(r => r.status === 'modified');
+            const noChanges = results.filter(r => r.status === 'no_changes');
+            const errors = results.filter(r => r.status === 'error');
+            const totalSubs = results.reduce((s, r) => s + (r.changes || 0), 0);
+            resultsSummary.innerHTML = `
+                <div class="result-stats">
+                    <div class="stat-box"><div class="stat-value">${results.length}</div><div class="stat-label">Procesados</div></div>
+                    <div class="stat-box"><div class="stat-value" style="color:#059669">${modified.length}</div><div class="stat-label">Modificados</div></div>
+                    <div class="stat-box"><div class="stat-value" style="color:#f59e0b">${noChanges.length}</div><div class="stat-label">Sin cambios</div></div>
+                    <div class="stat-box"><div class="stat-value" style="color:#dc2626">${errors.length}</div><div class="stat-label">Errores</div></div>
+                    <div class="stat-box"><div class="stat-value">${totalSubs}</div><div class="stat-label">Sustituciones</div></div>
+                </div>`;
+            let detailsHtml = '';
+            results.forEach(r => {
+                if (r.status === 'modified') {
+                    detailsHtml += `<div class="result-card success"><strong>${escapeHtml(r.fileName)}</strong> → <code>${escapeHtml(r.outputName)}</code><br><small>${r.changes} sustitución(es)</small></div>`;
+                } else if (r.status === 'no_changes') {
+                    detailsHtml += `<div class="result-card warning"><strong>${escapeHtml(r.fileName)}</strong> — Sin coincidencias.</div>`;
+                } else {
+                    detailsHtml += `<div class="result-card error"><strong>${escapeHtml(r.fileName)}</strong> — Error: ${escapeHtml(r.error)}</div>`;
+                }
+            });
+            resultsDetails.innerHTML = detailsHtml;
+            downloadFolderBtn.disabled = modified.length === 0;
+            downloadIndividualBtn.disabled = modified.length === 0;
+            downloadReportBtn.disabled = results.length === 0;
+            applyBtn.disabled = true;
+            state.previewResults = null;
+        }
+
+        // ---------- DESCARGAS ----------
+        function supportsDirectoryPicker() {
+            return typeof window.showDirectoryPicker === 'function';
+        }
+        async function downloadToFolder() {
+            if (!state.processedResults) return;
+            const modified = state.processedResults.filter(r => r.status === 'modified');
+            if (modified.length === 0) { alert('No hay archivos modificados.'); return; }
+            if (!supportsDirectoryPicker()) {
+                if (confirm('Tu navegador no permite elegir carpeta. ¿Descargar uno por uno?')) downloadIndividualFiles();
+                return;
+            }
+            try {
+                const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'downloads' });
+                let saved = 0;
+                const errors = [];
+                for (const r of modified) {
+                    try {
+                        const fileHandle = await dirHandle.getFileHandle(r.outputName, { create: true });
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(r.blob);
+                        await writable.close();
+                        saved++;
+                    } catch (err) { errors.push(`${r.outputName}: ${err.message}`); }
+                }
+                let msg = `✅ ${saved} archivo(s) guardado(s).`;
+                if (errors.length) msg += `\n\n⚠️ Errores:\n${errors.join('\n')}`;
+                alert(msg);
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                alert('Error: ' + err.message);
+            }
+        }
+        function downloadIndividualFiles() {
+            if (!state.processedResults) return;
+            const modified = state.processedResults.filter(r => r.status === 'modified');
+            if (modified.length === 0) { alert('No hay archivos.'); return; }
+            modified.forEach((r, idx) => setTimeout(() => downloadBlob(r.blob, r.outputName), idx * 300));
+            alert(`Descargando ${modified.length} archivo(s).`);
+        }
+        function downloadReport() {
+            if (!state.processedResults) return;
+            const results = state.processedResults;
+            const totalSubs = results.reduce((s, r) => s + (r.changes || 0), 0);
+            let report = '========================================\n';
+            report += 'REPORTE DE SUSTITUCIONES\n';
+            report += `Fecha: ${new Date().toLocaleString('es-ES')}\n`;
+            report += '========================================\n\n';
+            report += `Archivos procesados: ${results.length}\n`;
+            report += `Archivos modificados: ${results.filter(r => r.status === 'modified').length}\n`;
+            report += `Archivos sin cambios: ${results.filter(r => r.status === 'no_changes').length}\n`;
+            report += `Archivos con errores: ${results.filter(r => r.status === 'error').length}\n`;
+            report += `Total sustituciones: ${totalSubs}\n\n`;
+            report += '--- REGLAS APLICADAS ---\n';
+            state.rules.forEach((r, i) => { report += `${i + 1}. "${r.search}" → "${r.replace}"\n`; });
+            report += '\n--- DETALLE POR ARCHIVO ---\n\n';
+            results.forEach(r => {
+                report += `Archivo: ${r.fileName}\n`;
+                report += `  Estado: ${r.status === 'modified' ? 'MODIFICADO' : r.status === 'no_changes' ? 'SIN CAMBIOS' : 'ERROR'}\n`;
+                if (r.error) report += `  Error: ${r.error}\n`;
+                if (r.status === 'modified') {
+                    report += `  Salida: ${r.outputName}\n  Cambios: ${r.changes}\n`;
+                    (r.details || []).forEach(d => {
+                        report += `    [${d.sheet}!${d.cell}] N° ${d.itemNum || '—'} - ${d.itemDesc || '(sin desc)'}\n`;
+                        report += `        "${d.original}" → "${d.replaced}"\n`;
+                    });
+                }
+                report += '\n';
+            });
+            const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
+            downloadBlob(blob, 'reporte_sustituciones.txt');
+        }
+        function downloadBlob(blob, name) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = name;
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // ---------- PROGRESO ----------
+        function showProgress(text, percent) {
+            progressBar.classList.remove('hidden');
+            progressText.textContent = text;
+            progressFill.style.width = `${Math.min(percent, 100)}%`;
+        }
+        function updateProgress(text, percent) {
+            progressText.textContent = text;
+            progressFill.style.width = `${Math.min(percent, 100)}%`;
+        }
+        function hideProgress() {
+            progressBar.classList.add('hidden');
+            progressFill.style.width = '0%';
+        }
+
+        // ---------- UTILIDADES ----------
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = String(str);
+            return div.innerHTML;
+        }
+        function escapeHtmlAttr(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        // ---------- EVENT LISTENERS ----------
+        fileInput.addEventListener('change', (e) => { addFiles(e.target.files); fileInput.value = ''; });
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault(); dropZone.classList.remove('dragover');
+            addFiles(e.dataTransfer.files);
+        });
+        addRuleBtn.addEventListener('click', addRule);
+        [searchInput, replaceInput].forEach(input => input.addEventListener('keydown', (e) => { if (e.key === 'Enter') addRule(); }));
+        analyzeBtn.addEventListener('click', analyzeFiles);
+        applyBtn.addEventListener('click', applyReplacements);
+        downloadFolderBtn.addEventListener('click', downloadToFolder);
+        downloadIndividualBtn.addEventListener('click', downloadIndividualFiles);
+        downloadReportBtn.addEventListener('click', downloadReport);
+        catalogInput.addEventListener('change', (e) => {
+            const f = e.target.files[0];
+            if (f) importCatalogFromFile(f);
+            catalogInput.value = '';
+        });
+        exportCatalogBtn.addEventListener('click', exportCatalog);
+        copyCatalogBtn.addEventListener('click', copyCatalogAsCode);
+        resetCatalogBtn.addEventListener('click', resetCatalog);
+
+        // Exponer funciones al scope global
+        window.__sst_removeFile = removeFile;
+        window.__sst_removeRule = removeRule;
+
+        // Inicialización
+        loadCatalog();
+        renderCatalogDatalist();
+        renderRules();
+        updateButtonStates();
+    })();
+    </script>
+
+    <!-- ============================================================ -->
+    <!-- SCRIPT: APP GENERADOR MULTI-COPIAS                           -->
+    <!-- ============================================================ -->
+    <script>
+    (function() {
+        let baseFile = null;
+        let names = [];
+        let supportsDirectoryPicker = false;
+
+        const dropZoneBase = document.getElementById('drop-zone-base');
+        const baseFileInput = document.getElementById('base-file-input');
+        const baseFileDisplay = document.getElementById('base-file-display');
+
+        const tabBtns = document.querySelectorAll('#app-generador .tab-btn');
+        const tabContents = document.querySelectorAll('#app-generador .tab-content');
+
+        const namesTextarea = document.getElementById('names-textarea');
+        const addNamesBtn = document.getElementById('add-names-btn');
+        const namesFileInput = document.getElementById('names-file-input');
+
+        const namesListUI = document.getElementById('names-list');
+        const emptyStateUI = document.getElementById('empty-state');
+        const totalCountUI = document.getElementById('total-count');
+        const clearAllBtn = document.getElementById('clear-all-btn');
+
+        const duplicateWarning = document.getElementById('duplicate-warning');
+        const removeDuplicatesBtn = document.getElementById('remove-duplicates-btn');
+
+        const generateBtn = document.getElementById('generate-btn');
+        const generateHint = document.getElementById('generate-hint');
+        const toastContainer = document.getElementById('toast-container');
+
+        // Verificar compatibilidad
+        window.addEventListener('DOMContentLoaded', () => {
+            if ('showDirectoryPicker' in window) {
+                supportsDirectoryPicker = true;
+            } else {
+                supportsDirectoryPicker = false;
+                generateBtn.innerHTML = '<i class="fa-solid fa-file-zipper text-xl"></i><span>GENERAR ARCHIVO ZIP</span>';
+                generateHint.innerHTML = 'Tu navegador no soporta el guardado directo en carpetas. Se descargará un archivo .zip';
+            }
+        });
+
+        // Toast
+        function showToast(message, type = 'success', duration = 3000) {
+            const toast = document.createElement('div');
+            const icon = type === 'success' ? '<i class="fa-solid fa-circle-check text-green-500"></i>'
+                       : type === 'error' ? '<i class="fa-solid fa-circle-xmark text-red-500"></i>'
+                       : '<i class="fa-solid fa-circle-info text-blue-500"></i>';
+            toast.className = `bg-white px-4 py-3 rounded-lg shadow-lg border-l-4 ${type === 'success' ? 'border-green-500' : type === 'error' ? 'border-red-500' : 'border-blue-500'} flex items-center gap-3 transform transition-all duration-300 translate-x-full opacity-0 max-w-sm`;
+            toast.innerHTML = `${icon} <p class="text-sm font-medium text-slate-700 m-0">${message}</p>`;
+            toastContainer.appendChild(toast);
+            setTimeout(() => toast.classList.remove('translate-x-full', 'opacity-0'), 10);
+            if (duration > 0) {
+                setTimeout(() => {
+                    toast.classList.add('translate-x-full', 'opacity-0');
+                    setTimeout(() => toast.remove(), 300);
+                }, duration);
+            }
+        }
+
+        // Tabs internas
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                tabBtns.forEach(b => {
+                    b.classList.remove('border-primary', 'text-primary');
+                    b.classList.add('border-transparent', 'text-slate-500');
+                });
+                tabContents.forEach(c => c.classList.add('hidden'));
+                btn.classList.add('border-primary', 'text-primary');
+                btn.classList.remove('border-transparent', 'text-slate-500');
+                document.getElementById(btn.dataset.target).classList.remove('hidden');
+            });
+        });
+
+        // Archivo base
+        function handleBaseFile(file) {
+            if (!file) return;
+            const validExts = ['.xlsx', '.xls', '.xlsm'];
+            const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+            if (!validExts.includes(ext)) {
+                showToast('Formato no válido. Usa .xlsx, .xls o .xlsm', 'error');
+                return;
+            }
+            baseFile = file;
+            baseFileDisplay.innerHTML = `
+                <div class="bg-primary/10 text-primary w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <i class="fa-solid fa-file-excel text-2xl"></i>
+                </div>
+                <p class="text-sm font-bold text-slate-800 break-all">${file.name}</p>
+                <p class="text-xs text-slate-500 mt-1">${(file.size / 1024).toFixed(1)} KB</p>
+                <button id="remove-base-btn" class="mt-3 text-xs text-red-500 hover:text-red-700 underline font-medium relative z-10 pointer-events-auto">Quitar archivo</button>
+            `;
+            document.getElementById('remove-base-btn').addEventListener('click', (e) => {
+                e.preventDefault(); e.stopPropagation();
+                baseFile = null; baseFileInput.value = '';
+                baseFileDisplay.innerHTML = `
+                    <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 mb-2"></i>
+                    <p class="text-sm font-medium text-slate-700">Haz clic o arrastra tu archivo aquí</p>
+                    <p class="text-xs text-slate-400 mt-1">Soporta .xlsx, .xls, .xlsm</p>
+                `;
+            });
+            showToast('Archivo base cargado');
+        }
+        baseFileInput.addEventListener('change', (e) => handleBaseFile(e.target.files[0]));
+        dropZoneBase.addEventListener('dragover', (e) => { e.preventDefault(); dropZoneBase.classList.add('drag-over'); });
+        dropZoneBase.addEventListener('dragleave', (e) => { e.preventDefault(); dropZoneBase.classList.remove('drag-over'); });
+        dropZoneBase.addEventListener('drop', (e) => {
+            e.preventDefault(); dropZoneBase.classList.remove('drag-over');
+            if (e.dataTransfer.files.length) handleBaseFile(e.dataTransfer.files[0]);
+        });
+
+        // Nombres
+        function sanitizeFilename(name) { return name.replace(/[\\/:"*?<>|]/g, '').trim(); }
+        function renderNamesList() {
+            namesListUI.innerHTML = '';
+            totalCountUI.textContent = names.length;
+            if (names.length === 0) {
+                emptyStateUI.classList.remove('hidden');
+                namesListUI.classList.add('hidden');
+                duplicateWarning.classList.add('hidden');
+                return;
+            }
+            emptyStateUI.classList.add('hidden');
+            namesListUI.classList.remove('hidden');
+            const uniqueNames = new Set(names);
+            if (uniqueNames.size < names.length) duplicateWarning.classList.remove('hidden');
+            else duplicateWarning.classList.add('hidden');
+            const fragment = document.createDocumentFragment();
+            names.forEach((name, index) => {
+                const li = document.createElement('li');
+                li.className = "flex justify-between items-center p-2 hover:bg-white rounded-md border border-transparent hover:border-slate-200 transition-colors group";
+                const isDupe = names.indexOf(name) !== names.lastIndexOf(name);
+                const textColor = isDupe ? 'text-amber-600 font-semibold' : 'text-slate-700';
+                li.innerHTML = `
+                    <div class="flex items-center gap-2 truncate">
+                        <span class="text-xs text-slate-400 w-6 text-right">${index + 1}.</span>
+                        <span class="text-sm ${textColor} truncate" title="${name}">${name}</span>
+                    </div>
+                    <button class="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1" data-index="${index}" title="Eliminar">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                `;
+                fragment.appendChild(li);
+            });
+            namesListUI.appendChild(fragment);
+            namesListUI.querySelectorAll('button[data-index]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idx = parseInt(e.currentTarget.dataset.index);
+                    names.splice(idx, 1);
+                    renderNamesList();
+                });
+            });
+        }
+        function processNewNames(rawTextArray) {
+            let addedCount = 0;
+            rawTextArray.forEach(line => {
+                const cleanName = sanitizeFilename(line);
+                if (cleanName.length > 0) { names.push(cleanName); addedCount++; }
+            });
+            if (addedCount > 0) {
+                renderNamesList();
+                showToast(`Se agregaron ${addedCount} nombres`);
+            } else showToast('No se encontraron nombres válidos', 'warning');
+        }
+        addNamesBtn.addEventListener('click', () => {
+            const lines = namesTextarea.value.split(/\r?\n/);
+            processNewNames(lines);
+            namesTextarea.value = '';
+        });
+        namesFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const data = event.target.result;
+                    let rawNames = [];
+                    if (ext === '.txt' || ext === '.csv') {
+                        const textDecoder = new TextDecoder('utf-8');
+                        rawNames = textDecoder.decode(data).split(/\r?\n/);
+                    } else if (ext === '.xlsx' || ext === '.xls') {
+                        const workbook = XLSX.read(data, {type: 'array'});
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const rows = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
+                        rawNames = rows.map(row => row[0]).filter(v => v !== undefined && v !== null).map(String);
+                    }
+                    processNewNames(rawNames);
+                } catch (error) {
+                    console.error(error);
+                    showToast('Error al leer el archivo.', 'error');
+                }
+                namesFileInput.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        });
+        clearAllBtn.addEventListener('click', () => {
+            if (names.length === 0) return;
+            names = []; renderNamesList(); showToast('Lista limpiada');
+        });
+        removeDuplicatesBtn.addEventListener('click', () => {
+            const unique = [...new Set(names)];
+            const removed = names.length - unique.length;
+            names = unique; renderNamesList();
+            showToast(`Se eliminaron ${removed} duplicados`);
+        });
+
+        // Generación
+        generateBtn.addEventListener('click', async () => {
+            if (!baseFile) {
+                showToast('Primero importa un archivo base', 'error');
+                dropZoneBase.classList.add('border-red-500', 'bg-red-50');
+                setTimeout(() => dropZoneBase.classList.remove('border-red-500', 'bg-red-50'), 1000);
+                return;
+            }
+            if (names.length === 0) { showToast('La lista está vacía', 'error'); return; }
+
+            const originalBtnHtml = generateBtn.innerHTML;
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-xl"></i> <span>PROCESANDO...</span>';
+
+            try {
+                const baseExt = baseFile.name.substring(baseFile.name.lastIndexOf('.'));
+                if (supportsDirectoryPicker) {
+                    let dirHandle;
+                    try {
+                        dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                    } catch (err) {
+                        if (err.name === 'AbortError') { showToast('Cancelado', 'warning'); return; }
+                        throw err;
+                    }
+                    let successCount = 0;
+                    const existingNames = new Set();
+                    for (const name of names) {
+                        let finalName = name.toLowerCase().endsWith(baseExt.toLowerCase()) ? name : `${name}${baseExt}`;
+                        let counter = 1;
+                        let checkName = finalName;
+                        while (existingNames.has(checkName)) {
+                            const nameWithoutExt = finalName.substring(0, finalName.lastIndexOf('.'));
+                            checkName = `${nameWithoutExt}_(${counter})${baseExt}`;
+                            counter++;
+                        }
+                        existingNames.add(checkName);
+                        try {
+                            const fileHandle = await dirHandle.getFileHandle(checkName, { create: true });
+                            const writable = await fileHandle.createWritable();
+                            await writable.write(baseFile);
+                            await writable.close();
+                            successCount++;
+                        } catch (fileErr) { console.error(fileErr); }
+                    }
+                    showToast(`¡Éxito! Se guardaron ${successCount} archivos.`);
+                } else {
+                    generateBtn.innerHTML = '<i class="fa-solid fa-file-zipper fa-spin text-xl"></i> <span>EMPAQUETANDO ZIP...</span>';
+                    const zip = new JSZip();
+                    names.forEach((name) => {
+                        const finalName = name.toLowerCase().endsWith(baseExt.toLowerCase()) ? name : `${name}${baseExt}`;
+                        let fileNameInZip = finalName;
+                        let counter = 1;
+                        while (zip.file(fileNameInZip)) {
+                            const nameWithoutExt = finalName.substring(0, finalName.lastIndexOf('.'));
+                            fileNameInZip = `${nameWithoutExt}_(${counter})${baseExt}`;
+                            counter++;
+                        }
+                        zip.file(fileNameInZip, baseFile);
+                    });
+                    const zipBlob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+                    const downloadLink = document.createElement("a");
+                    downloadLink.href = URL.createObjectURL(zipBlob);
+                    const baseName = baseFile.name.substring(0, baseFile.name.lastIndexOf('.'));
+                    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+                    downloadLink.download = `Copias_${baseName}_${dateStr}.zip`;
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    setTimeout(() => { document.body.removeChild(downloadLink); URL.revokeObjectURL(downloadLink.href); }, 100);
+                    showToast(`¡Éxito! ZIP con ${names.length} archivos.`);
+                }
+            } catch (error) {
+                console.error(error);
+                showToast('Ocurrió un error inesperado.', 'error');
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = originalBtnHtml;
+            }
+        });
+    })();
+    </script>
 </body>
 </html>
