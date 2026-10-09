@@ -34,8 +34,10 @@
           <span class="catalog-hint">Catálogo activo para autocompletado</span>
         </div>
         <div class="catalog-actions">
-          <label for="catalogInput" class="btn btn-secondary btn-small">📥 Importar catálogo</label>
+          <label for="catalogInput" class="btn btn-secondary btn-small">📥 Importar</label>
           <input type="file" id="catalogInput" accept=".xlsx" hidden>
+          <button id="exportCatalogBtn" class="btn btn-secondary btn-small" title="Descargar el catálogo actual como .xlsx">📤 Exportar</button>
+          <button id="copyCatalogBtn" class="btn btn-secondary btn-small" title="Copiar el catálogo como código JavaScript para pegar en script.js">📋 Copiar como código</button>
           <button id="resetCatalogBtn" class="btn btn-secondary btn-small" title="Restaurar catálogo por defecto">↺ Restablecer</button>
         </div>
       </div>
