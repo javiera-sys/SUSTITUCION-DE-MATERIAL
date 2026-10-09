@@ -1,8 +1,9 @@
 /**
  * Sustituidor de Materiales Excel
- * Procesamiento 100% local con ExcelJS + JSZip
+ * Procesamiento 100% local con ExcelJS
  * 
  * Muestra N° y DESCRIPTION de la fila donde se encuentra cada coincidencia.
+ * Descarga: guardar en carpeta elegida (File System Access API) o uno por uno.
  */
 
 // ============================================================
@@ -40,7 +41,8 @@ const previewContent = $('#previewContent');
 const sectionResults = $('#section-results');
 const resultsSummary = $('#resultsSummary');
 const resultsDetails = $('#resultsDetails');
-const downloadZipBtn = $('#downloadZipBtn');
+const downloadFolderBtn = $('#downloadFolderBtn');
+const downloadIndividualBtn = $('#downloadIndividualBtn');
 const downloadReportBtn = $('#downloadReportBtn');
 
 // ============================================================
@@ -504,7 +506,8 @@ function renderResults(results) {
   });
 
   resultsDetails.innerHTML = detailsHtml;
-  downloadZipBtn.disabled = modified.length === 0;
+  downloadFolderBtn.disabled = modified.length === 0;
+  downloadIndividualBtn.disabled = modified.length === 0;
   downloadReportBtn.disabled = results.length === 0;
   applyBtn.disabled = true;
   state.previewResults = null;
@@ -513,16 +516,91 @@ function renderResults(results) {
 // ============================================================
 // DESCARGAS
 // ============================================================
-async function downloadZip() {
+
+/**
+ * Verifica si el navegador soporta File System Access API
+ */
+function supportsDirectoryPicker() {
+  return typeof window.showDirectoryPicker === 'function';
+}
+
+/**
+ * Pregunta al usuario en qué carpeta guardar los archivos y los escribe allí.
+ * Usa File System Access API (Chrome/Edge/Opera).
+ */
+async function downloadToFolder() {
   if (!state.processedResults) return;
+
   const modified = state.processedResults.filter(r => r.status === 'modified');
-  if (modified.length === 0) return;
+  if (modified.length === 0) {
+    alert('No hay archivos modificados para guardar.');
+    return;
+  }
 
-  const zip = new JSZip();
-  for (const r of modified) zip.file(r.outputName, r.blob);
+  if (!supportsDirectoryPicker()) {
+    const usarFallback = confirm(
+      'Tu navegador no permite elegir una carpeta de destino.\n\n' +
+      '¿Quieres descargar los archivos uno por uno en la carpeta de descargas por defecto?'
+    );
+    if (usarFallback) downloadIndividualFiles();
+    return;
+  }
 
-  const zipBlob = await zip.generateAsync({ type: 'blob' });
-  downloadBlob(zipBlob, 'materiales_modificados.zip');
+  try {
+    // Pregunta al usuario qué carpeta usar
+    const dirHandle = await window.showDirectoryPicker({
+      mode: 'readwrite',
+      startIn: 'downloads'
+    });
+
+    let saved = 0;
+    const errors = [];
+
+    for (const r of modified) {
+      try {
+        const fileHandle = await dirHandle.getFileHandle(r.outputName, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(r.blob);
+        await writable.close();
+        saved++;
+      } catch (err) {
+        errors.push(`${r.outputName}: ${err.message}`);
+      }
+    }
+
+    let msg = `✅ ${saved} archivo(s) guardado(s) en la carpeta seleccionada.`;
+    if (errors.length > 0) {
+      msg += `\n\n⚠️ Errores:\n${errors.join('\n')}`;
+    }
+    alert(msg);
+  } catch (err) {
+    // El usuario canceló el diálogo
+    if (err.name === 'AbortError') return;
+    console.error(err);
+    alert('No se pudo guardar en la carpeta seleccionada: ' + err.message);
+  }
+}
+
+/**
+ * Descarga cada archivo modificado individualmente (fallback universal).
+ */
+function downloadIndividualFiles() {
+  if (!state.processedResults) return;
+
+  const modified = state.processedResults.filter(r => r.status === 'modified');
+  if (modified.length === 0) {
+    alert('No hay archivos modificados para descargar.');
+    return;
+  }
+
+  modified.forEach((r, idx) => {
+    // Pequeño delay para que el navegador no bloquee múltiples descargas
+    setTimeout(() => {
+      downloadBlob(r.blob, r.outputName);
+    }, idx * 300);
+  });
+
+  alert(`Se están descargando ${modified.length} archivo(s). Revisa tu carpeta de descargas.`);
 }
 
 function downloadReport() {
@@ -631,7 +709,8 @@ addRuleBtn.addEventListener('click', addRule);
 
 analyzeBtn.addEventListener('click', analyzeFiles);
 applyBtn.addEventListener('click', applyReplacements);
-downloadZipBtn.addEventListener('click', downloadZip);
+downloadFolderBtn.addEventListener('click', downloadToFolder);
+downloadIndividualBtn.addEventListener('click', downloadIndividualFiles);
 downloadReportBtn.addEventListener('click', downloadReport);
 
 window.removeFile = removeFile;
