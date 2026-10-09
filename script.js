@@ -2,10 +2,7 @@
  * Sustituidor de Materiales Excel
  * Procesamiento 100% local con ExcelJS + JSZip
  * 
- * LIMITACIONES CONOCIDAS:
- * - Solo .xlsx (ExcelJS no soporta .xls)
- * - Data validations complejas pueden verse afectadas (bug de ExcelJS)
- * - Fórmulas no se recalculan automáticamente
+ * Muestra N° y DESCRIPTION de la fila donde se encuentra cada coincidencia.
  */
 
 // ============================================================
@@ -233,9 +230,16 @@ function analyzeWorkbook(workbook, rules, options) {
 
   workbook.eachSheet((worksheet) => {
     worksheet.eachRow({ includeEmpty: false }, (row) => {
+      const rowNum = row.number;
+      const cellA = worksheet.getCell(`A${rowNum}`);
+      const cellB = worksheet.getCell(`B${rowNum}`);
+      const numValue = cellA.value != null ? String(cellA.value).trim() : '';
+      const descValue = cellB.value != null ? String(cellB.value).trim() : '';
+
       row.eachCell({ includeEmpty: false }, (cell) => {
         const cellValue = cell.value;
         if (typeof cellValue !== 'string') return;
+        if (cell.col === 1 || cell.col === 2) return;
 
         for (const rule of rules) {
           const m = findMatchWithReplacement(
@@ -246,6 +250,9 @@ function analyzeWorkbook(workbook, rules, options) {
             changes.push({
               sheet: worksheet.name,
               cell: cell.address,
+              rowNum: rowNum,
+              itemNum: numValue,
+              itemDesc: descValue,
               original: cellValue,
               replaced: m.result,
               ruleSearch: rule.search,
@@ -302,6 +309,10 @@ function renderPreview(results) {
 
     r.changes.forEach(c => {
       html += `<div class="preview-change-block">
+        <div class="preview-row-info">
+          <span class="badge-item">N° ${escapeHtml(c.itemNum || '—')}</span>
+          <span class="item-desc">${escapeHtml(c.itemDesc || '(sin descripción)')}</span>
+        </div>
         <div class="preview-cell-ref">
           <span class="badge-sheet">${escapeHtml(c.sheet)}</span>
           <span class="badge-cell">${c.cell}</span>
@@ -414,9 +425,16 @@ function applyToWorkbook(workbook, rules, options) {
 
   workbook.eachSheet((worksheet) => {
     worksheet.eachRow({ includeEmpty: false }, (row) => {
+      const rowNum = row.number;
+      const cellA = worksheet.getCell(`A${rowNum}`);
+      const cellB = worksheet.getCell(`B${rowNum}`);
+      const numValue = cellA.value != null ? String(cellA.value).trim() : '';
+      const descValue = cellB.value != null ? String(cellB.value).trim() : '';
+
       row.eachCell({ includeEmpty: false }, (cell) => {
         const cellValue = cell.value;
         if (typeof cellValue !== 'string') return;
+        if (cell.col === 1 || cell.col === 2) return;
 
         for (const rule of rules) {
           const m = findMatchWithReplacement(
@@ -429,6 +447,9 @@ function applyToWorkbook(workbook, rules, options) {
             details.push({
               sheet: worksheet.name,
               cell: cell.address,
+              rowNum: rowNum,
+              itemNum: numValue,
+              itemDesc: descValue,
               original: cellValue,
               replaced: m.result,
               rule: rule.search
@@ -532,7 +553,8 @@ function downloadReport() {
     if (r.status === 'modified') {
       report += `  Salida: ${r.outputName}\n  Cambios: ${r.changes}\n`;
       (r.details || []).forEach(d => {
-        report += `    [${d.sheet}!${d.cell}] "${d.original}" → "${d.replaced}"\n`;
+        report += `    [${d.sheet}!${d.cell}] N° ${d.itemNum || '—'} - ${d.itemDesc || '(sin desc)'}\n`;
+        report += `        "${d.original}" → "${d.replaced}"\n`;
       });
     }
     report += '\n';
