@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sustituidor de Materiales Excel</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1>SUSTITUIDOR DE MATERIALES EXCEL</h1>
+    <p class="subtitle">Herramienta local para reemplazar nombres de materiales preservando el formato original</p>
+  </header>
+
+  <main class="app-container">
+    <section class="panel" id="section-upload">
+      <h2>1. Cargar Archivos Excel</h2>
+      <div class="upload-zone" id="dropZone">
+        <p>Arrastra archivos <strong>.xlsx</strong> aquí o</p>
+        <label for="fileInput" class="btn btn-secondary">Seleccionar Archivos</label>
+        <input type="file" id="fileInput" accept=".xlsx,.xls" multiple hidden>
+        <p class="hint">Solo .xlsx con preservación completa de formato. Los archivos .xls deben convertirse primero a .xlsx en Excel.</p>
+      </div>
+      <ul id="fileList" class="file-list"></ul>
+    </section>
+
+    <section class="panel" id="section-rules">
+      <h2>2. Reglas de Sustitución</h2>
+      <div class="rule-input-group">
+        <input type="text" id="searchInput" placeholder="Material a buscar (ej: TRIPLAY OKUME 4MM)">
+        <input type="text" id="replaceInput" placeholder="Sustituir por (ej: TRIPLAY PINO 4MM)">
+        <button id="addRuleBtn" class="btn btn-primary">Agregar Regla</button>
+      </div>
+      <div class="rule-options">
+        <label class="checkbox-label">
+          <input type="checkbox" id="caseSensitive"> Distinguir mayúsculas/minúsculas
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="exactMatch"> Solo coincidencia exacta de celda completa
+        </label>
+      </div>
+      <table class="rules-table">
+        <thead>
+          <tr><th>Buscar</th><th>Sustituir por</th><th>Acción</th></tr>
+        </thead>
+        <tbody id="rulesBody"></tbody>
+      </table>
+    </section>
+
+    <section class="panel" id="section-actions">
+      <h2>3. Procesar</h2>
+      <div class="action-buttons">
+        <button id="analyzeBtn" class="btn btn-primary btn-large" disabled>ANALIZAR ARCHIVOS</button>
+        <button id="applyBtn" class="btn btn-success btn-large" disabled>APLICAR SUSTITUCIONES</button>
+      </div>
+      <div class="progress-bar hidden" id="progressBar">
+        <div class="progress-fill" id="progressFill"></div>
+        <span class="progress-text" id="progressText"></span>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="section-preview">
+      <h2>Vista Previa de Cambios</h2>
+      <div id="previewContent"></div>
+    </section>
+
+    <section class="panel hidden" id="section-results">
+      <h2>Resultados</h2>
+      <div id="resultsSummary"></div>
+      <div id="resultsDetails"></div>
+      <div class="download-buttons">
+        <button id="downloadZipBtn" class="btn btn-primary" disabled>DESCARGAR TODO (ZIP)</button>
+        <button id="downloadReportBtn" class="btn btn-secondary" disabled>DESCARGAR REPORTE (TXT)</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>Procesamiento 100% local · Los archivos nunca salen de tu navegador</p>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
