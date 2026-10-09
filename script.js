@@ -3,7 +3,7 @@
  * Procesamiento 100% local con ExcelJS
  *
  * - Muestra N° y DESCRIPTION de la fila donde se encuentra cada coincidencia.
- * - Catálogo de materiales con autocompletado (datalist) + importable desde .xlsx.
+ * - Catálogo de materiales con autocompletado (datalist) + importable/exportable desde .xlsx.
  * - Descarga: guardar en carpeta elegida (File System Access API) o uno por uno.
  */
 
@@ -11,46 +11,46 @@
 // CATÁLOGO POR DEFECTO (extraído de NOMENCLATURA DE MATERIALES.xlsx)
 // ============================================================
 const DEFAULT_CATALOG = [
-  { num: 1,  material: 'TRIPLAY OKUME 15MM',       tipo: 'HOJA', detalles: '' },
-  { num: 2,  material: 'TRIPLAY OKUME 12MM',       tipo: 'HOJA', detalles: '' },
-  { num: 3,  material: 'TRIPLAY OKUME 4MM',        tipo: 'HOJA', detalles: '' },
-  { num: 4,  material: 'TRIPLAY PINO 4MM',         tipo: 'HOJA', detalles: 'NUEVO' },
-  { num: 5,  material: 'MULTIPLAY PINO 18MM',      tipo: 'HOJA', detalles: '' },
-  { num: 6,  material: 'MULTIPLAY PINO 9MM',       tipo: 'HOJA', detalles: '' },
-  { num: 7,  material: 'MDF 15MM',                 tipo: 'HOJA', detalles: '' },
-  { num: 8,  material: 'MDF 17MM',                 tipo: 'HOJA', detalles: '' },
-  { num: 9,  material: 'MDF 19MM',                 tipo: 'HOJA', detalles: '' },
-  { num: 10, material: 'MDF 3MM',                  tipo: 'HOJA', detalles: '' },
-  { num: 11, material: 'CIMBRA 15MM',              tipo: 'HOJA', detalles: '' },
-  { num: 12, material: 'TRIPLAY MELINA 13MM',      tipo: 'HOJA', detalles: '' },
-  { num: 13, material: 'TRIPLAY MELINA 18MM',      tipo: 'HOJA', detalles: '' },
-  { num: 14, material: 'TRIPLAY MELINA 9MM',       tipo: 'HOJA', detalles: '' },
-  { num: 15, material: 'TRIPLAY MELINA FLEX 4MM',  tipo: 'HOJA', detalles: '' },
-  { num: 16, material: 'TRIPLAY TECA CAFE 12MM',   tipo: 'HOJA', detalles: 'CAMBIO A 13MM' },
-  { num: 17, material: 'TRIPLAY TECA CAFE 18MM',   tipo: 'HOJA', detalles: '' },
-  { num: 18, material: 'TRIPLAY TECA CAFE 9MM',    tipo: 'HOJA', detalles: '' },
+  { num: 1,  material: 'TRIPLAY OKUME 15MM',         tipo: 'HOJA', detalles: '' },
+  { num: 2,  material: 'TRIPLAY OKUME 12MM',         tipo: 'HOJA', detalles: '' },
+  { num: 3,  material: 'TRIPLAY OKUME 4MM',          tipo: 'HOJA', detalles: '' },
+  { num: 4,  material: 'TRIPLAY PINO 4MM',           tipo: 'HOJA', detalles: 'NUEVO' },
+  { num: 5,  material: 'MULTIPLAY PINO 18MM',        tipo: 'HOJA', detalles: '' },
+  { num: 6,  material: 'MULTIPLAY PINO 9MM',         tipo: 'HOJA', detalles: '' },
+  { num: 7,  material: 'MDF 15MM',                   tipo: 'HOJA', detalles: '' },
+  { num: 8,  material: 'MDF 17MM',                   tipo: 'HOJA', detalles: '' },
+  { num: 9,  material: 'MDF 19MM',                   tipo: 'HOJA', detalles: '' },
+  { num: 10, material: 'MDF 3MM',                    tipo: 'HOJA', detalles: '' },
+  { num: 11, material: 'CIMBRA 15MM',                tipo: 'HOJA', detalles: '' },
+  { num: 12, material: 'TRIPLAY MELINA 13MM',        tipo: 'HOJA', detalles: '' },
+  { num: 13, material: 'TRIPLAY MELINA 18MM',        tipo: 'HOJA', detalles: '' },
+  { num: 14, material: 'TRIPLAY MELINA 9MM',         tipo: 'HOJA', detalles: '' },
+  { num: 15, material: 'TRIPLAY MELINA FLEX 4MM',    tipo: 'HOJA', detalles: '' },
+  { num: 16, material: 'TRIPLAY TECA CAFE 12MM',     tipo: 'HOJA', detalles: 'CAMBIO A 13MM' },
+  { num: 17, material: 'TRIPLAY TECA CAFE 18MM',     tipo: 'HOJA', detalles: '' },
+  { num: 18, material: 'TRIPLAY TECA CAFE 9MM',      tipo: 'HOJA', detalles: '' },
   { num: 19, material: 'TRIPLAY TECA CAFE FLEX 4MM', tipo: 'HOJA', detalles: '' },
-  { num: 20, material: 'TRIPLAY TECA PINTA 12MM',  tipo: 'HOJA', detalles: 'CAMBIO A 13MM' },
-  { num: 21, material: 'TRIPLAY TECA PINTA 18MM',  tipo: 'HOJA', detalles: '' },
-  { num: 22, material: 'TRIPLAY TECA PINTA 9MM',   tipo: 'HOJA', detalles: '' },
+  { num: 20, material: 'TRIPLAY TECA PINTA 12MM',    tipo: 'HOJA', detalles: 'CAMBIO A 13MM' },
+  { num: 21, material: 'TRIPLAY TECA PINTA 18MM',    tipo: 'HOJA', detalles: '' },
+  { num: 22, material: 'TRIPLAY TECA PINTA 9MM',     tipo: 'HOJA', detalles: '' },
   { num: 23, material: 'TRIPLAY TECA PINTA FLEX 4MM', tipo: 'HOJA', detalles: '' },
-  { num: 24, material: 'TRIPLAY NOGAL 12MM',       tipo: 'HOJA', detalles: '' },
-  { num: 25, material: 'TRIPLAY NOGAL 18MM',       tipo: 'HOJA', detalles: '' },
-  { num: 26, material: 'TRIPLAY NOGAL 9MM',        tipo: 'HOJA', detalles: '' },
-  { num: 27, material: 'TRIPLAY ROSA MORADA 9MM',  tipo: 'HOJA', detalles: '' },
-  { num: 28, material: 'TRIPLAY PAROTA 12MM',      tipo: 'HOJA', detalles: '' },
-  { num: 29, material: 'MANGO',                    tipo: 'PT',   detalles: '' },
-  { num: 30, material: 'PINO',                     tipo: 'PT',   detalles: '' },
-  { num: 31, material: 'POPLAR',                   tipo: 'PT',   detalles: '' },
-  { num: 32, material: 'HULE',                     tipo: 'PT',   detalles: '' },
-  { num: 33, material: 'HABILLO',                  tipo: 'PT',   detalles: '' },
-  { num: 34, material: 'MELINA',                   tipo: 'PT',   detalles: '' },
-  { num: 35, material: 'REC. NO PAROTA',           tipo: 'PT',   detalles: '' },
-  { num: 36, material: 'RECUPERACION',             tipo: 'PT',   detalles: '' },
-  { num: 37, material: 'REC. MANGO',               tipo: 'PT',   detalles: '' },
-  { num: 38, material: 'REC. PINO',                tipo: 'PT',   detalles: '' },
-  { num: 39, material: 'REC. MELINA',              tipo: 'PT',   detalles: '' },
-  { num: 40, material: 'MULTIMADERA',              tipo: 'PT',   detalles: 'DESCRIBIR QUE MATERIAL SON' }
+  { num: 24, material: 'TRIPLAY NOGAL 12MM',         tipo: 'HOJA', detalles: '' },
+  { num: 25, material: 'TRIPLAY NOGAL 18MM',         tipo: 'HOJA', detalles: '' },
+  { num: 26, material: 'TRIPLAY NOGAL 9MM',          tipo: 'HOJA', detalles: '' },
+  { num: 27, material: 'TRIPLAY ROSA MORADA 9MM',    tipo: 'HOJA', detalles: '' },
+  { num: 28, material: 'TRIPLAY PAROTA 12MM',        tipo: 'HOJA', detalles: '' },
+  { num: 29, material: 'MANGO',                      tipo: 'PT',   detalles: '' },
+  { num: 30, material: 'PINO',                       tipo: 'PT',   detalles: '' },
+  { num: 31, material: 'POPLAR',                     tipo: 'PT',   detalles: '' },
+  { num: 32, material: 'HULE',                       tipo: 'PT',   detalles: '' },
+  { num: 33, material: 'HABILLO',                    tipo: 'PT',   detalles: '' },
+  { num: 34, material: 'MELINA',                     tipo: 'PT',   detalles: '' },
+  { num: 35, material: 'REC. NO PAROTA',             tipo: 'PT',   detalles: '' },
+  { num: 36, material: 'RECUPERACION',               tipo: 'PT',   detalles: '' },
+  { num: 37, material: 'REC. MANGO',                 tipo: 'PT',   detalles: '' },
+  { num: 38, material: 'REC. PINO',                  tipo: 'PT',   detalles: '' },
+  { num: 39, material: 'REC. MELINA',                tipo: 'PT',   detalles: '' },
+  { num: 40, material: 'MULTIMADERA',                tipo: 'PT',   detalles: 'DESCRIBIR QUE MATERIAL SON' }
 ];
 
 const STORAGE_KEY = 'sustituidor_catalogo_materiales_v1';
@@ -98,6 +98,8 @@ const downloadReportBtn = $('#downloadReportBtn');
 const catalogInput = $('#catalogInput');
 const catalogCount = $('#catalogCount');
 const resetCatalogBtn = $('#resetCatalogBtn');
+const exportCatalogBtn = $('#exportCatalogBtn');
+const copyCatalogBtn = $('#copyCatalogBtn');
 
 // ============================================================
 // CATÁLOGO
@@ -127,7 +129,6 @@ function saveCatalog() {
 }
 
 function renderCatalogDatalist() {
-  // Ordena alfabéticamente para que el autocompletado sea cómodo
   const items = [...state.catalog].sort((a, b) =>
     a.material.localeCompare(b.material, 'es')
   );
@@ -159,7 +160,7 @@ async function importCatalogFromFile(file) {
       const tipo = cC != null ? String(cC).trim() : '';
       const detalles = cD != null ? String(cD).trim() : '';
 
-      // Salta encabezado (fila # / MATERIAL / TIPO / DETALLES)
+      // Salta encabezado
       if (!headerSkipped) {
         if (/^#?$/.test(numStr) || /material/i.test(material)) {
           headerSkipped = true;
@@ -216,6 +217,83 @@ function resetCatalog() {
   state.catalog = DEFAULT_CATALOG.map(m => ({ ...m }));
   saveCatalog();
   renderCatalogDatalist();
+}
+
+/**
+ * Exporta el catálogo actual a un archivo .xlsx con el mismo formato del original.
+ */
+async function exportCatalog() {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Hoja1');
+
+    sheet.columns = [
+      { header: '#',        key: 'num',      width: 6 },
+      { header: 'MATERIAL', key: 'material', width: 32 },
+      { header: 'TIPO',     key: 'tipo',     width: 10 },
+      { header: 'DETALLES', key: 'detalles', width: 30 }
+    ];
+    sheet.getRow(1).font = { bold: true };
+
+    state.catalog.forEach((m, i) => {
+      sheet.addRow([
+        m.num || (i + 1),
+        m.material || '',
+        m.tipo || '',
+        m.detalles || ''
+      ]);
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    downloadBlob(blob, 'NOMENCLATURA_DE_MATERIALES_ACTUALIZADO.xlsx');
+  } catch (err) {
+    console.error(err);
+    alert('Error al exportar el catálogo: ' + (err.message || err));
+  }
+}
+
+/**
+ * Copia el catálogo actual como código JavaScript listo para pegar en DEFAULT_CATALOG.
+ */
+async function copyCatalogAsCode() {
+  const lines = state.catalog.map((m, i) => {
+    const num = String(m.num || (i + 1)).padStart(2, ' ');
+    const material = `'${String(m.material || '').replace(/'/g, "\\'")}'`.padEnd(45, ' ');
+    const tipo = `'${String(m.tipo || '').replace(/'/g, "\\'")}'`.padEnd(8, ' ');
+    const detalles = `'${String(m.detalles || '').replace(/'/g, "\\'")}'`;
+    return `  { num: ${num}, material: ${material}, tipo: ${tipo}, detalles: ${detalles} }`;
+  });
+
+  const code = `const DEFAULT_CATALOG = [\n${lines.join(',\n')}\n];`;
+
+  try {
+    await navigator.clipboard.writeText(code);
+    alert(
+      '✅ Catálogo copiado al portapapeles.\n\n' +
+      'Ahora:\n' +
+      '1. Abre tu script.js en GitHub\n' +
+      '2. Reemplaza el array DEFAULT_CATALOG completo\n' +
+      '3. Haz commit para que todos vean los materiales nuevos'
+    );
+  } catch (err) {
+    // Fallback si el navegador no permite clipboard
+    const ta = document.createElement('textarea');
+    ta.value = code;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      alert('✅ Catálogo copiado al portapapeles.');
+    } catch (e) {
+      prompt('Copia manualmente el siguiente código:', code);
+    }
+    document.body.removeChild(ta);
+  }
 }
 
 // ============================================================
@@ -699,7 +777,6 @@ function supportsDirectoryPicker() {
 
 /**
  * Pregunta al usuario en qué carpeta guardar los archivos y los escribe allí.
- * Usa File System Access API (Chrome/Edge/Opera).
  */
 async function downloadToFolder() {
   if (!state.processedResults) return;
@@ -895,6 +972,8 @@ catalogInput.addEventListener('change', (e) => {
   if (f) importCatalogFromFile(f);
   catalogInput.value = '';
 });
+exportCatalogBtn.addEventListener('click', exportCatalog);
+copyCatalogBtn.addEventListener('click', copyCatalogAsCode);
 resetCatalogBtn.addEventListener('click', resetCatalog);
 
 window.removeFile = removeFile;
