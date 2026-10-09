@@ -11,7 +11,6 @@
   --text-muted: #64748b;
   --radius: 8px;
   --shadow: 0 1px 3px rgba(0,0,0,0.1);
-  --excel-yellow: #FFFF00;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -181,23 +180,6 @@ body {
 }
 .preview-change-block:last-child { border-bottom: none; }
 
-/* Bloque resaltado en amarillo (como en Excel) */
-.preview-highlighted {
-  background: var(--excel-yellow);
-  border-bottom: 2px solid #eab308;
-}
-.preview-highlighted .preview-value {
-  background: rgba(255, 255, 255, 0.75);
-}
-.preview-highlighted .preview-value.value-old {
-  background: #fff5f5;
-  border-color: #fecaca;
-}
-.preview-highlighted .preview-value.value-new {
-  background: #f0fdf4;
-  border-color: #a7f3d0;
-}
-
 /* Información de fila (N° + DESCRIPTION) */
 .preview-row-info {
   display: flex;
@@ -205,7 +187,7 @@ body {
   gap: 0.6rem;
   margin-bottom: 0.6rem;
   padding: 0.5rem 0.75rem;
-  background: rgba(255, 255, 255, 0.9);
+  background: #f1f5f9;
   border-left: 4px solid var(--primary);
   border-radius: 4px;
   flex-wrap: wrap;
@@ -280,15 +262,6 @@ body {
   background: #ecfdf5;
   border: 1px solid #a7f3d0;
   color: #064e3b;
-}
-
-/* Resaltado amarillo tipo Excel dentro del texto */
-.hl-yellow {
-  background: var(--excel-yellow);
-  color: #000;
-  padding: 0 2px;
-  font-weight: 700;
-  border-radius: 2px;
 }
 
 /* Results */
