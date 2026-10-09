@@ -179,6 +179,35 @@ body {
   border-bottom: 1px solid #f1f5f9;
 }
 .preview-change-block:last-child { border-bottom: none; }
+
+/* Información de fila (N° + DESCRIPTION) */
+.preview-row-info {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  background: #f1f5f9;
+  border-left: 4px solid var(--primary);
+  border-radius: 4px;
+  flex-wrap: wrap;
+}
+.badge-item {
+  background: var(--primary);
+  color: white;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.item-desc {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+}
+
 .preview-cell-ref {
   display: flex;
   gap: 0.5rem;
