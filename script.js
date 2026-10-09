@@ -1,10 +1,59 @@
 /**
  * Sustituidor de Materiales Excel
  * Procesamiento 100% local con ExcelJS
- * 
- * Muestra N° y DESCRIPTION de la fila donde se encuentra cada coincidencia.
- * Descarga: guardar en carpeta elegida (File System Access API) o uno por uno.
+ *
+ * - Muestra N° y DESCRIPTION de la fila donde se encuentra cada coincidencia.
+ * - Catálogo de materiales con autocompletado (datalist) + importable desde .xlsx.
+ * - Descarga: guardar en carpeta elegida (File System Access API) o uno por uno.
  */
+
+// ============================================================
+// CATÁLOGO POR DEFECTO (extraído de NOMENCLATURA DE MATERIALES.xlsx)
+// ============================================================
+const DEFAULT_CATALOG = [
+  { num: 1,  material: 'TRIPLAY OKUME 15MM',       tipo: 'HOJA', detalles: '' },
+  { num: 2,  material: 'TRIPLAY OKUME 12MM',       tipo: 'HOJA', detalles: '' },
+  { num: 3,  material: 'TRIPLAY OKUME 4MM',        tipo: 'HOJA', detalles: '' },
+  { num: 4,  material: 'TRIPLAY PINO 4MM',         tipo: 'HOJA', detalles: 'NUEVO' },
+  { num: 5,  material: 'MULTIPLAY PINO 18MM',      tipo: 'HOJA', detalles: '' },
+  { num: 6,  material: 'MULTIPLAY PINO 9MM',       tipo: 'HOJA', detalles: '' },
+  { num: 7,  material: 'MDF 15MM',                 tipo: 'HOJA', detalles: '' },
+  { num: 8,  material: 'MDF 17MM',                 tipo: 'HOJA', detalles: '' },
+  { num: 9,  material: 'MDF 19MM',                 tipo: 'HOJA', detalles: '' },
+  { num: 10, material: 'MDF 3MM',                  tipo: 'HOJA', detalles: '' },
+  { num: 11, material: 'CIMBRA 15MM',              tipo: 'HOJA', detalles: '' },
+  { num: 12, material: 'TRIPLAY MELINA 13MM',      tipo: 'HOJA', detalles: '' },
+  { num: 13, material: 'TRIPLAY MELINA 18MM',      tipo: 'HOJA', detalles: '' },
+  { num: 14, material: 'TRIPLAY MELINA 9MM',       tipo: 'HOJA', detalles: '' },
+  { num: 15, material: 'TRIPLAY MELINA FLEX 4MM',  tipo: 'HOJA', detalles: '' },
+  { num: 16, material: 'TRIPLAY TECA CAFE 12MM',   tipo: 'HOJA', detalles: 'CAMBIO A 13MM' },
+  { num: 17, material: 'TRIPLAY TECA CAFE 18MM',   tipo: 'HOJA', detalles: '' },
+  { num: 18, material: 'TRIPLAY TECA CAFE 9MM',    tipo: 'HOJA', detalles: '' },
+  { num: 19, material: 'TRIPLAY TECA CAFE FLEX 4MM', tipo: 'HOJA', detalles: '' },
+  { num: 20, material: 'TRIPLAY TECA PINTA 12MM',  tipo: 'HOJA', detalles: 'CAMBIO A 13MM' },
+  { num: 21, material: 'TRIPLAY TECA PINTA 18MM',  tipo: 'HOJA', detalles: '' },
+  { num: 22, material: 'TRIPLAY TECA PINTA 9MM',   tipo: 'HOJA', detalles: '' },
+  { num: 23, material: 'TRIPLAY TECA PINTA FLEX 4MM', tipo: 'HOJA', detalles: '' },
+  { num: 24, material: 'TRIPLAY NOGAL 12MM',       tipo: 'HOJA', detalles: '' },
+  { num: 25, material: 'TRIPLAY NOGAL 18MM',       tipo: 'HOJA', detalles: '' },
+  { num: 26, material: 'TRIPLAY NOGAL 9MM',        tipo: 'HOJA', detalles: '' },
+  { num: 27, material: 'TRIPLAY ROSA MORADA 9MM',  tipo: 'HOJA', detalles: '' },
+  { num: 28, material: 'TRIPLAY PAROTA 12MM',      tipo: 'HOJA', detalles: '' },
+  { num: 29, material: 'MANGO',                    tipo: 'PT',   detalles: '' },
+  { num: 30, material: 'PINO',                     tipo: 'PT',   detalles: '' },
+  { num: 31, material: 'POPLAR',                   tipo: 'PT',   detalles: '' },
+  { num: 32, material: 'HULE',                     tipo: 'PT',   detalles: '' },
+  { num: 33, material: 'HABILLO',                  tipo: 'PT',   detalles: '' },
+  { num: 34, material: 'MELINA',                   tipo: 'PT',   detalles: '' },
+  { num: 35, material: 'REC. NO PAROTA',           tipo: 'PT',   detalles: '' },
+  { num: 36, material: 'RECUPERACION',             tipo: 'PT',   detalles: '' },
+  { num: 37, material: 'REC. MANGO',               tipo: 'PT',   detalles: '' },
+  { num: 38, material: 'REC. PINO',                tipo: 'PT',   detalles: '' },
+  { num: 39, material: 'REC. MELINA',              tipo: 'PT',   detalles: '' },
+  { num: 40, material: 'MULTIMADERA',              tipo: 'PT',   detalles: 'DESCRIBIR QUE MATERIAL SON' }
+];
+
+const STORAGE_KEY = 'sustituidor_catalogo_materiales_v1';
 
 // ============================================================
 // ESTADO GLOBAL
@@ -12,6 +61,7 @@
 const state = {
   files: [],
   rules: [],
+  catalog: [],
   previewResults: null,
   processedResults: null,
   fileIdCounter: 0,
@@ -27,6 +77,7 @@ const dropZone = $('#dropZone');
 const fileList = $('#fileList');
 const searchInput = $('#searchInput');
 const replaceInput = $('#replaceInput');
+const materialList = $('#materialList');
 const addRuleBtn = $('#addRuleBtn');
 const caseSensitiveCheck = $('#caseSensitive');
 const exactMatchCheck = $('#exactMatch');
@@ -44,6 +95,128 @@ const resultsDetails = $('#resultsDetails');
 const downloadFolderBtn = $('#downloadFolderBtn');
 const downloadIndividualBtn = $('#downloadIndividualBtn');
 const downloadReportBtn = $('#downloadReportBtn');
+const catalogInput = $('#catalogInput');
+const catalogCount = $('#catalogCount');
+const resetCatalogBtn = $('#resetCatalogBtn');
+
+// ============================================================
+// CATÁLOGO
+// ============================================================
+function loadCatalog() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        state.catalog = parsed;
+        return;
+      }
+    }
+  } catch (e) {
+    console.warn('No se pudo leer el catálogo guardado:', e);
+  }
+  state.catalog = DEFAULT_CATALOG.map(m => ({ ...m }));
+}
+
+function saveCatalog() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.catalog));
+  } catch (e) {
+    console.warn('No se pudo guardar el catálogo:', e);
+  }
+}
+
+function renderCatalogDatalist() {
+  // Ordena alfabéticamente para que el autocompletado sea cómodo
+  const items = [...state.catalog].sort((a, b) =>
+    a.material.localeCompare(b.material, 'es')
+  );
+  materialList.innerHTML = items.map(m =>
+    `<option value="${escapeHtmlAttr(m.material)}">${escapeHtmlAttr(m.tipo || '')}${m.detalles ? ' · ' + escapeHtmlAttr(m.detalles) : ''}</option>`
+  ).join('');
+  catalogCount.textContent = `${state.catalog.length} material${state.catalog.length === 1 ? '' : 'es'}`;
+}
+
+async function importCatalogFromFile(file) {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(arrayBuffer);
+    const worksheet = workbook.worksheets[0];
+    if (!worksheet) throw new Error('El archivo no contiene hojas.');
+
+    const nuevos = [];
+    let headerSkipped = false;
+
+    worksheet.eachRow({ includeEmpty: false }, (row) => {
+      const cA = row.getCell(1).value;
+      const cB = row.getCell(2).value;
+      const cC = row.getCell(3).value;
+      const cD = row.getCell(4).value;
+
+      const numStr = cA != null ? String(cA).trim() : '';
+      const material = cB != null ? String(cB).trim() : '';
+      const tipo = cC != null ? String(cC).trim() : '';
+      const detalles = cD != null ? String(cD).trim() : '';
+
+      // Salta encabezado (fila # / MATERIAL / TIPO / DETALLES)
+      if (!headerSkipped) {
+        if (/^#?$/.test(numStr) || /material/i.test(material)) {
+          headerSkipped = true;
+          return;
+        }
+        headerSkipped = true;
+      }
+
+      if (!material) return;
+      nuevos.push({
+        num: numStr ? Number(numStr) || numStr : '',
+        material,
+        tipo,
+        detalles
+      });
+    });
+
+    if (nuevos.length === 0) {
+      alert('No se encontraron materiales en el archivo. Verifica que tenga columnas: #, MATERIAL, TIPO, DETALLES.');
+      return;
+    }
+
+    const opcion = confirm(
+      `Se encontraron ${nuevos.length} material(es) en el archivo.\n\n` +
+      `Aceptar = REEMPLAZAR el catálogo actual.\n` +
+      `Cancelar = AGREGAR solo los que no existan.`
+    );
+
+    if (opcion) {
+      state.catalog = nuevos;
+    } else {
+      const existentes = new Set(state.catalog.map(m => m.material.toUpperCase()));
+      let agregados = 0;
+      nuevos.forEach(n => {
+        if (!existentes.has(n.material.toUpperCase())) {
+          state.catalog.push(n);
+          existentes.add(n.material.toUpperCase());
+          agregados++;
+        }
+      });
+      alert(`${agregados} material(es) nuevo(s) agregado(s) al catálogo.`);
+    }
+
+    saveCatalog();
+    renderCatalogDatalist();
+  } catch (err) {
+    console.error(err);
+    alert('Error al importar el catálogo: ' + (err.message || err));
+  }
+}
+
+function resetCatalog() {
+  if (!confirm('¿Restablecer el catálogo al listado original?\n\nSe perderán los materiales importados manualmente.')) return;
+  state.catalog = DEFAULT_CATALOG.map(m => ({ ...m }));
+  saveCatalog();
+  renderCatalogDatalist();
+}
 
 // ============================================================
 // GESTIÓN DE ARCHIVOS
@@ -547,7 +720,6 @@ async function downloadToFolder() {
   }
 
   try {
-    // Pregunta al usuario qué carpeta usar
     const dirHandle = await window.showDirectoryPicker({
       mode: 'readwrite',
       startIn: 'downloads'
@@ -574,7 +746,6 @@ async function downloadToFolder() {
     }
     alert(msg);
   } catch (err) {
-    // El usuario canceló el diálogo
     if (err.name === 'AbortError') return;
     console.error(err);
     alert('No se pudo guardar en la carpeta seleccionada: ' + err.message);
@@ -594,7 +765,6 @@ function downloadIndividualFiles() {
   }
 
   modified.forEach((r, idx) => {
-    // Pequeño delay para que el navegador no bloquee múltiples descargas
     setTimeout(() => {
       downloadBlob(r.blob, r.outputName);
     }, idx * 300);
@@ -678,6 +848,13 @@ function escapeHtml(str) {
   div.textContent = String(str);
   return div.innerHTML;
 }
+function escapeHtmlAttr(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
 
 // ============================================================
 // EVENT LISTENERS
@@ -713,8 +890,20 @@ downloadFolderBtn.addEventListener('click', downloadToFolder);
 downloadIndividualBtn.addEventListener('click', downloadIndividualFiles);
 downloadReportBtn.addEventListener('click', downloadReport);
 
+catalogInput.addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (f) importCatalogFromFile(f);
+  catalogInput.value = '';
+});
+resetCatalogBtn.addEventListener('click', resetCatalog);
+
 window.removeFile = removeFile;
 window.removeRule = removeRule;
 
+// ============================================================
+// INICIALIZACIÓN
+// ============================================================
+loadCatalog();
+renderCatalogDatalist();
 renderRules();
 updateButtonStates();
