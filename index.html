@@ -26,11 +26,29 @@
 
     <section class="panel" id="section-rules">
       <h2>2. Reglas de Sustitución</h2>
+
+      <!-- Catálogo de materiales -->
+      <div class="catalog-bar">
+        <div class="catalog-info">
+          <span class="catalog-badge" id="catalogCount">40 materiales</span>
+          <span class="catalog-hint">Catálogo activo para autocompletado</span>
+        </div>
+        <div class="catalog-actions">
+          <label for="catalogInput" class="btn btn-secondary btn-small">📥 Importar catálogo</label>
+          <input type="file" id="catalogInput" accept=".xlsx" hidden>
+          <button id="resetCatalogBtn" class="btn btn-secondary btn-small" title="Restaurar catálogo por defecto">↺ Restablecer</button>
+        </div>
+      </div>
+
       <div class="rule-input-group">
-        <input type="text" id="searchInput" placeholder="Material a buscar (ej: TRIPLAY OKUME 4MM)">
-        <input type="text" id="replaceInput" placeholder="Sustituir por (ej: TRIPLAY PINO 4MM)">
+        <input type="text" id="searchInput" list="materialList" placeholder="Material a buscar (ej: TRIPLAY OKUME 4MM)" autocomplete="off">
+        <input type="text" id="replaceInput" list="materialList" placeholder="Sustituir por (ej: TRIPLAY PINO 4MM)" autocomplete="off">
         <button id="addRuleBtn" class="btn btn-primary">Agregar Regla</button>
       </div>
+
+      <!-- Datalist con todos los materiales -->
+      <datalist id="materialList"></datalist>
+
       <div class="rule-options">
         <label class="checkbox-label">
           <input type="checkbox" id="caseSensitive"> Distinguir mayúsculas/minúsculas
