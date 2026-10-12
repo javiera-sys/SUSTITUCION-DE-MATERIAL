@@ -980,7 +980,7 @@
                     }
                     const buffer = await workbook.xlsx.writeBuffer();
                     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                    const outputName = fileEntry.file.name.replace(/\.xlsx$/i, '_MODIFICADO.xlsx');
+                    const outputName = fileEntry.file.name;
                     results.push({
                         fileName: fileEntry.file.name, status: 'modified',
                         changes: applyResult.totalChanges, outputName, blob,
