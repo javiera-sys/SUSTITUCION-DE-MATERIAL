@@ -602,7 +602,7 @@ function buildRichTextSegments(text, search, replacement, options, baseFont) {
   return segments;
 }
 
-// Quita el amarillo de filas que ya venían marcadas por una corrida anterior
+// Quita el amarillo y el texto rojo de filas que ya venían marcadas por una corrida anterior
 // (fila con varias celdas en amarillo puro FFFFFF00). Un amarillo aislado en
 // una o dos celdas se considera original y no se toca.
 const MIN_YELLOW_CELLS_PER_MARKED_ROW = 4;
@@ -611,6 +611,11 @@ function isYellowFill(cell) {
   const f = cell.style && cell.style.fill;
   return !!(f && f.type === 'pattern' && f.pattern === 'solid' &&
     f.fgColor && typeof f.fgColor.argb === 'string' && f.fgColor.argb.toUpperCase() === 'FFFFFF00');
+}
+
+function isRedFont(cell) {
+  const c = cell.style && cell.style.font && cell.style.font.color;
+  return !!(c && typeof c.argb === 'string' && c.argb.toUpperCase() === 'FFFF0000');
 }
 
 function clearPreviousRowMarks(workbook) {
@@ -624,6 +629,13 @@ function clearPreviousRowMarks(workbook) {
         cell.style = cloneStyle(cell.style);          // evita estilos compartidos
         cell.fill = { type: 'pattern', pattern: 'none' };
         clearedCells++;
+      });
+      // El texto en rojo de esa fila también era parte de la marca: vuelve a negro
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        if (isRedFont(cell)) {
+          cell.style = cloneStyle(cell.style);
+          cell.font = { ...(cell.style.font || {}), color: { argb: 'FF000000' } };
+        }
       });
     });
   });
