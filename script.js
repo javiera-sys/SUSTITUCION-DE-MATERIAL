@@ -2,8 +2,9 @@
  * Sustituidor de Materiales Excel
  * Procesamiento 100% local con ExcelJS
  *
- * Resalta en amarillo solo la celda modificada y en rojo solo el material
- * nuevo dentro de esa celda (texto enriquecido).
+ * Resalta en amarillo la fila (párrafo) donde hubo sustitución y en rojo solo
+ * el material nuevo dentro de su celda. Quita marcas amarillas de filas
+ * completas hechas en corridas anteriores.
  */
 
 // ============================================================
@@ -601,10 +602,42 @@ function buildRichTextSegments(text, search, replacement, options, baseFont) {
   return segments;
 }
 
+// Quita el amarillo de filas que ya venían marcadas por una corrida anterior
+// (fila con varias celdas en amarillo puro FFFFFF00). Un amarillo aislado en
+// una o dos celdas se considera original y no se toca.
+const MIN_YELLOW_CELLS_PER_MARKED_ROW = 4;
+
+function isYellowFill(cell) {
+  const f = cell.style && cell.style.fill;
+  return !!(f && f.type === 'pattern' && f.pattern === 'solid' &&
+    f.fgColor && typeof f.fgColor.argb === 'string' && f.fgColor.argb.toUpperCase() === 'FFFFFF00');
+}
+
+function clearPreviousRowMarks(workbook) {
+  let clearedCells = 0;
+  workbook.eachSheet((ws) => {
+    ws.eachRow({ includeEmpty: false }, (row) => {
+      const yellow = [];
+      row.eachCell({ includeEmpty: true }, (cell) => { if (isYellowFill(cell)) yellow.push(cell); });
+      if (yellow.length < MIN_YELLOW_CELLS_PER_MARKED_ROW) return;
+      yellow.forEach((cell) => {
+        cell.style = cloneStyle(cell.style);          // evita estilos compartidos
+        cell.fill = { type: 'pattern', pattern: 'none' };
+        clearedCells++;
+      });
+    });
+  });
+  return clearedCells;
+}
+
 function applyToWorkbook(workbook, rules, options) {
   let totalChanges = 0;
   const details = [];
   const changedKeys = new Set();            // registro de celdas realmente modificadas
+  const changedRows = [];                   // filas con sustitución real: [worksheet, rowNum]
+
+  // Marcas amarillas de corridas anteriores (se hace antes del snapshot)
+  const clearedPrevious = clearPreviousRowMarks(workbook);
   const originalStyles = snapshotStyles(workbook);
 
   workbook.eachSheet((worksheet) => {
@@ -614,6 +647,8 @@ function applyToWorkbook(workbook, rules, options) {
       const cellB = worksheet.getCell(`B${rowNum}`);
       const numValue = cellA.value != null ? String(cellA.value).trim() : '';
       const descValue = cellB.value != null ? String(cellB.value).trim() : '';
+
+      let rowChanged = false;
 
       row.eachCell({ includeEmpty: false }, (cell) => {
         const cellValue = cell.value;
@@ -641,10 +676,9 @@ function applyToWorkbook(workbook, rules, options) {
               cell.font = { ...baseFont, color: RED_COLOR };
             }
 
-            // 3) Sombreado amarillo solo en esta celda
-            cell.fill = cloneStyle(YELLOW_FILL);
-
+            // (el sombreado amarillo de la fila se aplica al terminar la fila)
             changedKeys.add(`${worksheet.id}!${cell.address}`);
+            rowChanged = true;
             totalChanges += m.count;
 
             details.push({
@@ -656,7 +690,21 @@ function applyToWorkbook(workbook, rules, options) {
           }
         }
       });
+
+      if (rowChanged) changedRows.push([worksheet, rowNum]);
     });
+  });
+
+  // Sombreado amarillo de TODA la fila (párrafo) solo para filas con sustitución real
+  const lastCol = (ws) => Math.max(ws.columnCount, 1);
+  changedRows.forEach(([ws, rowNum]) => {
+    const row = ws.getRow(rowNum);
+    for (let c = 1; c <= lastCol(ws); c++) {
+      const cell = row.getCell(c);
+      cell.style = cloneStyle(cell.style);
+      cell.fill = cloneStyle(YELLOW_FILL);
+      changedKeys.add(`${ws.id}!${cell.address}`);
+    }
   });
 
   // Verificación: ninguna celda fuera del registro puede haber cambiado de estilo.
@@ -677,7 +725,7 @@ function applyToWorkbook(workbook, rules, options) {
   });
   if (restoredCells > 0) console.warn(`Se restauró el estilo original de ${restoredCells} celda(s) no modificadas.`);
 
-  return { totalChanges, details, restoredCells };
+  return { totalChanges, details, restoredCells, clearedPrevious };
 }
 
 // ============================================================
