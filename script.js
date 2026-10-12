@@ -2,7 +2,8 @@
  * Sustituidor de Materiales Excel
  * Procesamiento 100% local con ExcelJS
  *
- * Resalta en amarillo las filas modificadas y en rojo las celdas que cambiaron.
+ * Resalta en amarillo toda la fila modificada y en rojo solo el texto
+ * de la celda del material que fue sustituido.
  */
 
 // ============================================================
@@ -564,7 +565,8 @@ function applyToWorkbook(workbook, rules, options) {
       const numValue = cellA.value != null ? String(cellA.value).trim() : '';
       const descValue = cellB.value != null ? String(cellB.value).trim() : '';
 
-      const changedCellsInRow = [];
+      // Bandera: ¿esta fila tuvo algún cambio?
+      let rowChanged = false;
 
       row.eachCell({ includeEmpty: false }, (cell) => {
         const cellValue = cell.value;
@@ -576,28 +578,17 @@ function applyToWorkbook(workbook, rules, options) {
           if (m.matched && m.result !== cellValue) {
             const valorOriginal = cellValue;
 
+            // Cambia el valor del material
             cell.value = m.result;
-            totalChanges += m.count;
 
-            // 🔴 Celda modificada: texto rojo + negrita + fondo rojo claro
+            // 🔴 Solo el texto en rojo (sin negritas, sin fondo, sin bordes)
             cell.font = {
               ...(cell.font || {}),
-              color: { argb: 'FFFF0000' },
-              bold: true
-            };
-            cell.fill = {
-              type: 'pattern',
-              pattern: 'solid',
-              fgColor: { argb: 'FFFFC7CE' }
-            };
-            cell.border = {
-              top:    { style: 'thin', color: { argb: 'FFFF9999' } },
-              left:   { style: 'thin', color: { argb: 'FFFF9999' } },
-              bottom: { style: 'thin', color: { argb: 'FFFF9999' } },
-              right:  { style: 'thin', color: { argb: 'FFFF9999' } }
+              color: { argb: 'FFFF0000' }
             };
 
-            changedCellsInRow.push(cell.address);
+            totalChanges += m.count;
+            rowChanged = true;
 
             details.push({
               sheet: worksheet.name, cell: cell.address, rowNum,
@@ -609,14 +600,14 @@ function applyToWorkbook(workbook, rules, options) {
         }
       });
 
-      // 🟡 Toda la fila que tuvo cambios: fondo amarillo
-      if (changedCellsInRow.length > 0) {
+      // 🟡 Si la fila tuvo cambios, pintar TODO el fondo de la fila en amarillo
+      //    (después de haber marcado el texto rojo para no perder el color de fuente)
+      if (rowChanged) {
         row.eachCell({ includeEmpty: false }, (cell) => {
-          if (changedCellsInRow.includes(cell.address)) return;
           cell.fill = {
             type: 'pattern',
             pattern: 'solid',
-            fgColor: { argb: 'FFFFFF00' }
+            fgColor: { argb: 'FFFFFF00' }  // amarillo puro
           };
         });
       }
