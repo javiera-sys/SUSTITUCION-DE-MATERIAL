@@ -565,10 +565,9 @@ function applyToWorkbook(workbook, rules, options) {
       const numValue = cellA.value != null ? String(cellA.value).trim() : '';
       const descValue = cellB.value != null ? String(cellB.value).trim() : '';
 
-      // Guardamos la dirección de la(s) celda(s) del material que cambian
-      const materialCellsChanged = [];
+      // Bandera: ¿esta fila tuvo algún cambio?
+      let rowChanged = false;
 
-      // 1️⃣ Primero recorremos para reemplazar valores y anotar cuáles cambiaron
       row.eachCell({ includeEmpty: false }, (cell) => {
         const cellValue = cell.value;
         if (typeof cellValue !== 'string') return;
@@ -579,11 +578,17 @@ function applyToWorkbook(workbook, rules, options) {
           if (m.matched && m.result !== cellValue) {
             const valorOriginal = cellValue;
 
-            // Solo cambiamos el VALOR, sin tocar estilos todavía
+            // Cambia el valor del material
             cell.value = m.result;
 
+            // 🔴 Solo el texto en rojo (sin negritas, sin fondo, sin bordes)
+            cell.font = {
+              ...(cell.font || {}),
+              color: { argb: 'FFFF0000' }
+            };
+
             totalChanges += m.count;
-            materialCellsChanged.push(cell.address);
+            rowChanged = true;
 
             details.push({
               sheet: worksheet.name, cell: cell.address, rowNum,
@@ -595,43 +600,13 @@ function applyToWorkbook(workbook, rules, options) {
         }
       });
 
-      // 2️⃣ Si la fila tuvo cambios: pintar toda la fila de amarillo
-      //    y forzar la fuente a negro SIN negritas en todas las celdas
-      if (materialCellsChanged.length > 0) {
+      // 🟡 Si la fila tuvo cambios, pintar TODO el fondo de la fila en amarillo
+      if (rowChanged) {
         row.eachCell({ includeEmpty: false }, (cell) => {
-          // Fondo amarillo para todas las celdas de la fila
           cell.fill = {
             type: 'pattern',
             pattern: 'solid',
-            fgColor: { argb: 'FFFFFF00' }
-          };
-
-          // Fuente negra normal (sin negritas) para todas las celdas
-          cell.font = {
-            name: cell.font?.name || 'Calibri',
-            size: cell.font?.size || 11,
-            color: { argb: 'FF000000' }, // negro
-            bold: false
-          };
-
-          // Borde fino negro en toda la fila para que se vea limpio
-          cell.border = {
-            top:    { style: 'thin', color: { argb: 'FF000000' } },
-            left:   { style: 'thin', color: { argb: 'FF000000' } },
-            bottom: { style: 'thin', color: { argb: 'FF000000' } },
-            right:  { style: 'thin', color: { argb: 'FF000000' } }
-          };
-        });
-
-        // 3️⃣ Después de pintar toda la fila, SOLO a las celdas del material
-        //    que cambiaron les ponemos texto ROJO (sin negritas, sin fondo rojo)
-        materialCellsChanged.forEach(addr => {
-          const cell = worksheet.getCell(addr);
-          cell.font = {
-            name: cell.font?.name || 'Calibri',
-            size: cell.font?.size || 11,
-            color: { argb: 'FFFF0000' }, // rojo
-            bold: false
+            fgColor: { argb: 'FFFFFF00' }  // amarillo puro
           };
         });
       }
@@ -640,7 +615,6 @@ function applyToWorkbook(workbook, rules, options) {
 
   return { totalChanges, details };
 }
-
 // ============================================================
 // RESULTADOS
 // ============================================================
