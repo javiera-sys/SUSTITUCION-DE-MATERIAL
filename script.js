@@ -1,14 +1,10 @@
 /**
  * Sustituidor de Materiales Excel
  * Procesamiento 100% local con ExcelJS
- *
- * - Muestra N° y DESCRIPTION de la fila donde se encuentra cada coincidencia.
- * - Catálogo de materiales con autocompletado (datalist) + importable/exportable desde .xlsx.
- * - Descarga: guardar en carpeta elegida (File System Access API) o uno por uno.
  */
 
 // ============================================================
-// CATÁLOGO POR DEFECTO (extraído de NOMENCLATURA DE MATERIALES.xlsx)
+// CATÁLOGO POR DEFECTO
 // ============================================================
 const DEFAULT_CATALOG = [
   { num: 1,  material: 'TRIPLAY OKUME 15MM',         tipo: 'HOJA', detalles: '' },
@@ -114,24 +110,17 @@ function loadCatalog() {
         return;
       }
     }
-  } catch (e) {
-    console.warn('No se pudo leer el catálogo guardado:', e);
-  }
+  } catch (e) { console.warn(e); }
   state.catalog = DEFAULT_CATALOG.map(m => ({ ...m }));
 }
 
 function saveCatalog() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.catalog));
-  } catch (e) {
-    console.warn('No se pudo guardar el catálogo:', e);
-  }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.catalog)); }
+  catch (e) { console.warn(e); }
 }
 
 function renderCatalogDatalist() {
-  const items = [...state.catalog].sort((a, b) =>
-    a.material.localeCompare(b.material, 'es')
-  );
+  const items = [...state.catalog].sort((a, b) => a.material.localeCompare(b.material, 'es'));
   materialList.innerHTML = items.map(m =>
     `<option value="${escapeHtmlAttr(m.material)}">${escapeHtmlAttr(m.tipo || '')}${m.detalles ? ' · ' + escapeHtmlAttr(m.detalles) : ''}</option>`
   ).join('');
@@ -154,39 +143,28 @@ async function importCatalogFromFile(file) {
       const cB = row.getCell(2).value;
       const cC = row.getCell(3).value;
       const cD = row.getCell(4).value;
-
       const numStr = cA != null ? String(cA).trim() : '';
       const material = cB != null ? String(cB).trim() : '';
       const tipo = cC != null ? String(cC).trim() : '';
       const detalles = cD != null ? String(cD).trim() : '';
 
-      // Salta encabezado
       if (!headerSkipped) {
-        if (/^#?$/.test(numStr) || /material/i.test(material)) {
-          headerSkipped = true;
-          return;
-        }
+        if (/^#?$/.test(numStr) || /material/i.test(material)) { headerSkipped = true; return; }
         headerSkipped = true;
       }
-
       if (!material) return;
-      nuevos.push({
-        num: numStr ? Number(numStr) || numStr : '',
-        material,
-        tipo,
-        detalles
-      });
+      nuevos.push({ num: numStr ? Number(numStr) || numStr : '', material, tipo, detalles });
     });
 
     if (nuevos.length === 0) {
-      alert('No se encontraron materiales en el archivo. Verifica que tenga columnas: #, MATERIAL, TIPO, DETALLES.');
+      alert('No se encontraron materiales en el archivo.');
       return;
     }
 
     const opcion = confirm(
-      `Se encontraron ${nuevos.length} material(es) en el archivo.\n\n` +
-      `Aceptar = REEMPLAZAR el catálogo actual.\n` +
-      `Cancelar = AGREGAR solo los que no existan.`
+      `Se encontraron ${nuevos.length} material(es).\n\n` +
+      `Aceptar = REEMPLAZAR catálogo actual.\n` +
+      `Cancelar = AGREGAR solo los nuevos.`
     );
 
     if (opcion) {
@@ -201,9 +179,8 @@ async function importCatalogFromFile(file) {
           agregados++;
         }
       });
-      alert(`${agregados} material(es) nuevo(s) agregado(s) al catálogo.`);
+      alert(`${agregados} material(es) nuevo(s) agregado(s).`);
     }
-
     saveCatalog();
     renderCatalogDatalist();
   } catch (err) {
@@ -213,20 +190,16 @@ async function importCatalogFromFile(file) {
 }
 
 function resetCatalog() {
-  if (!confirm('¿Restablecer el catálogo al listado original?\n\nSe perderán los materiales importados manualmente.')) return;
+  if (!confirm('¿Restablecer el catálogo al listado original?')) return;
   state.catalog = DEFAULT_CATALOG.map(m => ({ ...m }));
   saveCatalog();
   renderCatalogDatalist();
 }
 
-/**
- * Exporta el catálogo actual a un archivo .xlsx con el mismo formato del original.
- */
 async function exportCatalog() {
   try {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Hoja1');
-
     sheet.columns = [
       { header: '#',        key: 'num',      width: 6 },
       { header: 'MATERIAL', key: 'material', width: 32 },
@@ -234,30 +207,18 @@ async function exportCatalog() {
       { header: 'DETALLES', key: 'detalles', width: 30 }
     ];
     sheet.getRow(1).font = { bold: true };
-
     state.catalog.forEach((m, i) => {
-      sheet.addRow([
-        m.num || (i + 1),
-        m.material || '',
-        m.tipo || '',
-        m.detalles || ''
-      ]);
+      sheet.addRow([m.num || (i + 1), m.material || '', m.tipo || '', m.detalles || '']);
     });
-
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    });
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     downloadBlob(blob, 'NOMENCLATURA_DE_MATERIALES_ACTUALIZADO.xlsx');
   } catch (err) {
     console.error(err);
-    alert('Error al exportar el catálogo: ' + (err.message || err));
+    alert('Error al exportar: ' + (err.message || err));
   }
 }
 
-/**
- * Copia el catálogo actual como código JavaScript listo para pegar en DEFAULT_CATALOG.
- */
 async function copyCatalogAsCode() {
   const lines = state.catalog.map((m, i) => {
     const num = String(m.num || (i + 1)).padStart(2, ' ');
@@ -266,52 +227,33 @@ async function copyCatalogAsCode() {
     const detalles = `'${String(m.detalles || '').replace(/'/g, "\\'")}'`;
     return `  { num: ${num}, material: ${material}, tipo: ${tipo}, detalles: ${detalles} }`;
   });
-
   const code = `const DEFAULT_CATALOG = [\n${lines.join(',\n')}\n];`;
-
   try {
     await navigator.clipboard.writeText(code);
-    alert(
-      '✅ Catálogo copiado al portapapeles.\n\n' +
-      'Ahora:\n' +
-      '1. Abre tu script.js en GitHub\n' +
-      '2. Reemplaza el array DEFAULT_CATALOG completo\n' +
-      '3. Haz commit para que todos vean los materiales nuevos'
-    );
+    alert('✅ Catálogo copiado. Pega en DEFAULT_CATALOG de script.js');
   } catch (err) {
-    // Fallback si el navegador no permite clipboard
     const ta = document.createElement('textarea');
     ta.value = code;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    try {
-      document.execCommand('copy');
-      alert('✅ Catálogo copiado al portapapeles.');
-    } catch (e) {
-      prompt('Copia manualmente el siguiente código:', code);
-    }
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); alert('✅ Copiado.'); }
+    catch (e) { prompt('Copia manualmente:', code); }
     document.body.removeChild(ta);
   }
 }
 
 // ============================================================
-// GESTIÓN DE ARCHIVOS
+// ARCHIVOS
 // ============================================================
 function addFiles(files) {
-  const validFiles = Array.from(files).filter(f =>
-    f.name.endsWith('.xlsx') || f.name.endsWith('.xls')
-  );
-
+  const validFiles = Array.from(files).filter(f => f.name.endsWith('.xlsx') || f.name.endsWith('.xls'));
   validFiles.forEach(file => {
     if (file.name.endsWith('.xls')) {
-      alert(`"${file.name}" es un archivo .xls.\n\nExcelJS no puede procesar .xls sin pérdida de formato. Por favor:\n1. Abre el archivo en Excel\n2. Guárdalo como .xlsx\n3. Vuelve a cargarlo.`);
+      alert(`"${file.name}" es .xls. Conviértelo a .xlsx primero.`);
       return;
     }
     state.files.push({ file, id: `file-${++state.fileIdCounter}` });
   });
-
   renderFileList();
   updateButtonStates();
 }
@@ -339,19 +281,14 @@ function formatSize(bytes) {
 }
 
 // ============================================================
-// GESTIÓN DE REGLAS
+// REGLAS
 // ============================================================
 function addRule() {
   const search = searchInput.value.trim();
   const replace = replaceInput.value.trim();
-
   if (!search) { alert('El campo "Buscar" no puede estar vacío.'); return; }
-
-  const exists = state.rules.find(r =>
-    r.search.toLowerCase() === search.toLowerCase()
-  );
+  const exists = state.rules.find(r => r.search.toLowerCase() === search.toLowerCase());
   if (exists) { alert(`Ya existe una regla para "${search}".`); return; }
-
   state.rules.push({ id: `rule-${++state.ruleIdCounter}`, search, replace });
   searchInput.value = '';
   replaceInput.value = '';
@@ -392,7 +329,7 @@ function updateButtonStates() {
 }
 
 // ============================================================
-// LECTURA DE ARCHIVOS
+// LECTURA
 // ============================================================
 async function readWorkbook(file) {
   const arrayBuffer = await file.arrayBuffer();
@@ -401,34 +338,22 @@ async function readWorkbook(file) {
   return workbook;
 }
 
-// ============================================================
-// MATCHING
-// ============================================================
-function escapeRegex(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+function escapeRegex(str) { return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
 function findMatchWithReplacement(text, search, replacement, options) {
   const { caseSensitive, exactMatch } = options;
   let haystack = text;
   let needle = search;
-
-  if (!caseSensitive) {
-    haystack = haystack.toLowerCase();
-    needle = needle.toLowerCase();
-  }
-
+  if (!caseSensitive) { haystack = haystack.toLowerCase(); needle = needle.toLowerCase(); }
   if (exactMatch) {
     if (haystack === needle) return { matched: true, result: replacement, count: 1 };
     return { matched: false, result: text, count: 0 };
   }
-
   if (haystack.includes(needle)) {
     const regex = new RegExp(escapeRegex(search), caseSensitive ? 'g' : 'gi');
     const count = (text.match(regex) || []).length;
     return { matched: true, result: text.replace(regex, replacement), count };
   }
-
   return { matched: false, result: text, count: 0 };
 }
 
@@ -437,7 +362,6 @@ function findMatchWithReplacement(text, search, replacement, options) {
 // ============================================================
 async function analyzeFiles() {
   if (state.files.length === 0 || state.rules.length === 0) return;
-
   showProgress('Analizando archivos...', 0);
   const results = [];
   const total = state.files.length;
@@ -445,32 +369,27 @@ async function analyzeFiles() {
   for (let i = 0; i < total; i++) {
     const fileEntry = state.files[i];
     updateProgress(`Analizando: ${fileEntry.file.name}`, (i / total) * 100);
-
     try {
       const workbook = await readWorkbook(fileEntry.file);
       const changes = analyzeWorkbook(workbook, state.rules, {
         caseSensitive: caseSensitiveCheck.checked,
         exactMatch: exactMatchCheck.checked
       });
-
       results.push({
         fileName: fileEntry.file.name,
         fileId: fileEntry.id,
         changes,
-        totalChanges: changes.reduce((sum, c) => sum + c.count, 0),
+        totalChanges: changes.reduce((s, c) => s + c.count, 0),
         error: null
       });
     } catch (err) {
       results.push({
-        fileName: fileEntry.file.name,
-        fileId: fileEntry.id,
-        changes: [],
-        totalChanges: 0,
+        fileName: fileEntry.file.name, fileId: fileEntry.id,
+        changes: [], totalChanges: 0,
         error: err.message || 'Error al leer el archivo'
       });
     }
   }
-
   updateProgress('Análisis completado', 100);
   hideProgress();
   state.previewResults = results;
@@ -480,7 +399,6 @@ async function analyzeFiles() {
 
 function analyzeWorkbook(workbook, rules, options) {
   const changes = [];
-
   workbook.eachSheet((worksheet) => {
     worksheet.eachRow({ includeEmpty: false }, (row) => {
       const rowNum = row.number;
@@ -488,28 +406,18 @@ function analyzeWorkbook(workbook, rules, options) {
       const cellB = worksheet.getCell(`B${rowNum}`);
       const numValue = cellA.value != null ? String(cellA.value).trim() : '';
       const descValue = cellB.value != null ? String(cellB.value).trim() : '';
-
       row.eachCell({ includeEmpty: false }, (cell) => {
         const cellValue = cell.value;
         if (typeof cellValue !== 'string') return;
         if (cell.col === 1 || cell.col === 2) return;
-
         for (const rule of rules) {
-          const m = findMatchWithReplacement(
-            cellValue, rule.search, rule.replace, options
-          );
-
+          const m = findMatchWithReplacement(cellValue, rule.search, rule.replace, options);
           if (m.matched && m.result !== cellValue) {
             changes.push({
-              sheet: worksheet.name,
-              cell: cell.address,
-              rowNum: rowNum,
-              itemNum: numValue,
-              itemDesc: descValue,
-              original: cellValue,
-              replaced: m.result,
-              ruleSearch: rule.search,
-              ruleReplace: rule.replace,
+              sheet: worksheet.name, cell: cell.address, rowNum,
+              itemNum: numValue, itemDesc: descValue,
+              original: cellValue, replaced: m.result,
+              ruleSearch: rule.search, ruleReplace: rule.replace,
               count: m.count
             });
             break;
@@ -518,17 +426,15 @@ function analyzeWorkbook(workbook, rules, options) {
       });
     });
   });
-
   return changes;
 }
 
 // ============================================================
-// VISTA PREVIA
+// PREVIEW
 // ============================================================
 function renderPreview(results) {
   sectionPreview.classList.remove('hidden');
-
-  const totalChanges = results.reduce((sum, r) => sum + r.totalChanges, 0);
+  const totalChanges = results.reduce((s, r) => s + r.totalChanges, 0);
   const filesWithChanges = results.filter(r => r.totalChanges > 0);
 
   let html = `<p style="margin-bottom:1rem;font-size:0.85rem;color:#64748b">
@@ -537,29 +443,20 @@ function renderPreview(results) {
   </p>`;
 
   if (totalChanges === 0) {
-    html += `<div class="result-card warning">No se encontraron coincidencias con las reglas definidas.</div>`;
+    html += `<div class="result-card warning">No se encontraron coincidencias.</div>`;
   }
 
   results.forEach(r => {
     if (r.error) {
-      html += `<div class="result-card error">
-        <strong>${escapeHtml(r.fileName)}</strong> — Error: ${escapeHtml(r.error)}
-      </div>`;
+      html += `<div class="result-card error"><strong>${escapeHtml(r.fileName)}</strong> — Error: ${escapeHtml(r.error)}</div>`;
       return;
     }
-
     if (r.totalChanges === 0) {
-      html += `<div class="result-card warning">
-        <strong>${escapeHtml(r.fileName)}</strong> — Sin coincidencias
-      </div>`;
+      html += `<div class="result-card warning"><strong>${escapeHtml(r.fileName)}</strong> — Sin coincidencias</div>`;
       return;
     }
-
     html += `<div class="preview-file">
-      <div class="preview-file-header">
-        ${escapeHtml(r.fileName)} — ${r.totalChanges} cambio(s)
-      </div>`;
-
+      <div class="preview-file-header">${escapeHtml(r.fileName)} — ${r.totalChanges} cambio(s)</div>`;
     r.changes.forEach(c => {
       html += `<div class="preview-change-block">
         <div class="preview-row-info">
@@ -573,24 +470,20 @@ function renderPreview(results) {
         </div>
         <div class="preview-texts">
           <div class="preview-text-row">
-            <span class="preview-label label-old">Contenido actual de la celda:</span>
+            <span class="preview-label label-old">Contenido actual:</span>
             <div class="preview-value value-old">${escapeHtml(c.original)}</div>
           </div>
           <div class="preview-text-row">
-            <span class="preview-label label-new">Contenido después de la sustitución:</span>
+            <span class="preview-label label-new">Después de la sustitución:</span>
             <div class="preview-value value-new">${escapeHtml(c.replaced)}</div>
           </div>
         </div>
       </div>`;
     });
-
     html += `</div>`;
   });
 
-  html += `<div style="margin-top:1rem">
-    <button id="cancelPreviewBtn" class="btn btn-secondary">Cancelar</button>
-  </div>`;
-
+  html += `<div style="margin-top:1rem"><button id="cancelPreviewBtn" class="btn btn-secondary">Cancelar</button></div>`;
   previewContent.innerHTML = html;
 
   const cancelBtn = document.getElementById('cancelPreviewBtn');
@@ -604,11 +497,10 @@ function renderPreview(results) {
 }
 
 // ============================================================
-// APLICAR SUSTITUCIONES
+// APLICAR
 // ============================================================
 async function applyReplacements() {
   if (!state.previewResults) return;
-
   showProgress('Aplicando sustituciones...', 0);
   const results = [];
   const total = state.files.length;
@@ -616,7 +508,6 @@ async function applyReplacements() {
   for (let i = 0; i < total; i++) {
     const fileEntry = state.files[i];
     updateProgress(`Procesando: ${fileEntry.file.name}`, (i / total) * 100);
-
     try {
       const workbook = await readWorkbook(fileEntry.file);
       const applyResult = applyToWorkbook(workbook, state.rules, {
@@ -626,13 +517,8 @@ async function applyReplacements() {
 
       if (applyResult.totalChanges === 0) {
         results.push({
-          fileName: fileEntry.file.name,
-          status: 'no_changes',
-          changes: 0,
-          outputName: null,
-          blob: null,
-          error: null,
-          details: []
+          fileName: fileEntry.file.name, status: 'no_changes',
+          changes: 0, outputName: null, blob: null, error: null, details: []
         });
         continue;
       }
@@ -641,30 +527,23 @@ async function applyReplacements() {
       const blob = new Blob([buffer], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
-      const outputName = fileEntry.file.name.replace(/\.xlsx$/i, '_MODIFICADO.xlsx');
+
+      // ✅ AHORA CONSERVA EL NOMBRE ORIGINAL
+      const outputName = fileEntry.file.name;
 
       results.push({
-        fileName: fileEntry.file.name,
-        status: 'modified',
-        changes: applyResult.totalChanges,
-        outputName,
-        blob,
-        error: null,
-        details: applyResult.details
+        fileName: fileEntry.file.name, status: 'modified',
+        changes: applyResult.totalChanges, outputName, blob,
+        error: null, details: applyResult.details
       });
     } catch (err) {
       results.push({
-        fileName: fileEntry.file.name,
-        status: 'error',
-        changes: 0,
-        outputName: null,
-        blob: null,
-        error: err.message || 'Error al procesar',
-        details: []
+        fileName: fileEntry.file.name, status: 'error',
+        changes: 0, outputName: null, blob: null,
+        error: err.message || 'Error al procesar', details: []
       });
     }
   }
-
   updateProgress('Procesamiento completado', 100);
   hideProgress();
   state.processedResults = results;
@@ -675,7 +554,6 @@ async function applyReplacements() {
 function applyToWorkbook(workbook, rules, options) {
   let totalChanges = 0;
   const details = [];
-
   workbook.eachSheet((worksheet) => {
     worksheet.eachRow({ includeEmpty: false }, (row) => {
       const rowNum = row.number;
@@ -683,29 +561,19 @@ function applyToWorkbook(workbook, rules, options) {
       const cellB = worksheet.getCell(`B${rowNum}`);
       const numValue = cellA.value != null ? String(cellA.value).trim() : '';
       const descValue = cellB.value != null ? String(cellB.value).trim() : '';
-
       row.eachCell({ includeEmpty: false }, (cell) => {
         const cellValue = cell.value;
         if (typeof cellValue !== 'string') return;
         if (cell.col === 1 || cell.col === 2) return;
-
         for (const rule of rules) {
-          const m = findMatchWithReplacement(
-            cellValue, rule.search, rule.replace, options
-          );
-
+          const m = findMatchWithReplacement(cellValue, rule.search, rule.replace, options);
           if (m.matched && m.result !== cellValue) {
             cell.value = m.result;
             totalChanges += m.count;
             details.push({
-              sheet: worksheet.name,
-              cell: cell.address,
-              rowNum: rowNum,
-              itemNum: numValue,
-              itemDesc: descValue,
-              original: cellValue,
-              replaced: m.result,
-              rule: rule.search
+              sheet: worksheet.name, cell: cell.address, rowNum,
+              itemNum: numValue, itemDesc: descValue,
+              original: cellValue, replaced: m.result, rule: rule.search
             });
             break;
           }
@@ -713,7 +581,6 @@ function applyToWorkbook(workbook, rules, options) {
       });
     });
   });
-
   return { totalChanges, details };
 }
 
@@ -722,11 +589,10 @@ function applyToWorkbook(workbook, rules, options) {
 // ============================================================
 function renderResults(results) {
   sectionResults.classList.remove('hidden');
-
   const modified = results.filter(r => r.status === 'modified');
   const noChanges = results.filter(r => r.status === 'no_changes');
   const errors = results.filter(r => r.status === 'error');
-  const totalSubs = results.reduce((sum, r) => sum + (r.changes || 0), 0);
+  const totalSubs = results.reduce((s, r) => s + (r.changes || 0), 0);
 
   resultsSummary.innerHTML = `
     <div class="result-stats">
@@ -767,20 +633,12 @@ function renderResults(results) {
 // ============================================================
 // DESCARGAS
 // ============================================================
-
-/**
- * Verifica si el navegador soporta File System Access API
- */
 function supportsDirectoryPicker() {
   return typeof window.showDirectoryPicker === 'function';
 }
 
-/**
- * Pregunta al usuario en qué carpeta guardar los archivos y los escribe allí.
- */
 async function downloadToFolder() {
   if (!state.processedResults) return;
-
   const modified = state.processedResults.filter(r => r.status === 'modified');
   if (modified.length === 0) {
     alert('No hay archivos modificados para guardar.');
@@ -803,24 +661,46 @@ async function downloadToFolder() {
     });
 
     let saved = 0;
+    let skipped = 0;
     const errors = [];
 
     for (const r of modified) {
+      const targetName = r.outputName;
+
+      // Verificar si el archivo ya existe en la carpeta
+      let exists = false;
       try {
-        const fileHandle = await dirHandle.getFileHandle(r.outputName, { create: true });
+        await dirHandle.getFileHandle(targetName);
+        exists = true;
+      } catch (e) { /* No existe */ }
+
+      if (exists) {
+        const respuesta = confirm(
+          `Ya existe un archivo llamado "${targetName}" en la carpeta seleccionada.\n\n` +
+          `¿Deseas sobrescribirlo?\n\n` +
+          `Aceptar = Sí, sobrescribir\n` +
+          `Cancelar = No, omitir este archivo`
+        );
+        if (!respuesta) {
+          skipped++;
+          continue;
+        }
+      }
+
+      try {
+        const fileHandle = await dirHandle.getFileHandle(targetName, { create: true });
         const writable = await fileHandle.createWritable();
         await writable.write(r.blob);
         await writable.close();
         saved++;
       } catch (err) {
-        errors.push(`${r.outputName}: ${err.message}`);
+        errors.push(`${targetName}: ${err.message}`);
       }
     }
 
     let msg = `✅ ${saved} archivo(s) guardado(s) en la carpeta seleccionada.`;
-    if (errors.length > 0) {
-      msg += `\n\n⚠️ Errores:\n${errors.join('\n')}`;
-    }
+    if (skipped > 0) msg += `\n\n⏭️ ${skipped} archivo(s) omitido(s) (ya existían).`;
+    if (errors.length > 0) msg += `\n\n⚠️ Errores:\n${errors.join('\n')}`;
     alert(msg);
   } catch (err) {
     if (err.name === 'AbortError') return;
@@ -829,32 +709,23 @@ async function downloadToFolder() {
   }
 }
 
-/**
- * Descarga cada archivo modificado individualmente (fallback universal).
- */
 function downloadIndividualFiles() {
   if (!state.processedResults) return;
-
   const modified = state.processedResults.filter(r => r.status === 'modified');
   if (modified.length === 0) {
     alert('No hay archivos modificados para descargar.');
     return;
   }
-
   modified.forEach((r, idx) => {
-    setTimeout(() => {
-      downloadBlob(r.blob, r.outputName);
-    }, idx * 300);
+    setTimeout(() => downloadBlob(r.blob, r.outputName), idx * 300);
   });
-
   alert(`Se están descargando ${modified.length} archivo(s). Revisa tu carpeta de descargas.`);
 }
 
 function downloadReport() {
   if (!state.processedResults) return;
-
   const results = state.processedResults;
-  const totalSubs = results.reduce((sum, r) => sum + (r.changes || 0), 0);
+  const totalSubs = results.reduce((s, r) => s + (r.changes || 0), 0);
 
   let report = '========================================\n';
   report += 'REPORTE DE SUSTITUCIONES\n';
@@ -866,9 +737,7 @@ function downloadReport() {
   report += `Archivos con errores: ${results.filter(r => r.status === 'error').length}\n`;
   report += `Total sustituciones: ${totalSubs}\n\n`;
   report += '--- REGLAS APLICADAS ---\n';
-  state.rules.forEach((r, i) => {
-    report += `${i + 1}. "${r.search}" → "${r.replace}"\n`;
-  });
+  state.rules.forEach((r, i) => { report += `${i + 1}. "${r.search}" → "${r.replace}"\n`; });
   report += '\n--- DETALLE POR ARCHIVO ---\n\n';
 
   results.forEach(r => {
@@ -892,10 +761,8 @@ function downloadReport() {
 function downloadBlob(blob, name) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
@@ -940,33 +807,22 @@ fileInput.addEventListener('change', (e) => {
   addFiles(e.target.files);
   fileInput.value = '';
 });
-
-dropZone.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  dropZone.classList.add('dragover');
-});
-dropZone.addEventListener('dragleave', () => {
-  dropZone.classList.remove('dragover');
-});
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
 dropZone.addEventListener('drop', (e) => {
   e.preventDefault();
   dropZone.classList.remove('dragover');
   addFiles(e.dataTransfer.files);
 });
-
 addRuleBtn.addEventListener('click', addRule);
 [searchInput, replaceInput].forEach(input => {
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') addRule();
-  });
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') addRule(); });
 });
-
 analyzeBtn.addEventListener('click', analyzeFiles);
 applyBtn.addEventListener('click', applyReplacements);
 downloadFolderBtn.addEventListener('click', downloadToFolder);
 downloadIndividualBtn.addEventListener('click', downloadIndividualFiles);
 downloadReportBtn.addEventListener('click', downloadReport);
-
 catalogInput.addEventListener('change', (e) => {
   const f = e.target.files[0];
   if (f) importCatalogFromFile(f);
