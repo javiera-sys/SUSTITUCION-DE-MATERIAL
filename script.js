@@ -2,8 +2,8 @@
  * Sustituidor de Materiales Excel
  * Procesamiento 100% local con ExcelJS
  *
- * Resalta en amarillo toda la fila modificada y en rojo solo el texto
- * de la celda del material que fue sustituido.
+ * Resalta en amarillo solo la celda modificada y en rojo solo el material
+ * nuevo dentro de esa celda (texto enriquecido).
  */
 
 // ============================================================
@@ -553,9 +553,59 @@ async function applyReplacements() {
   sectionPreview.classList.add('hidden');
 }
 
+// ------------------------------------------------------------
+// Helpers de estilo
+// ExcelJS comparte el MISMO objeto de estilo entre todas las celdas que
+// tienen el mismo estilo en el archivo cargado. Si se asigna cell.font /
+// cell.fill sin clonar antes, se modifica ese objeto compartido y el
+// cambio aparece en todas las celdas con ese estilo (hojas enteras en
+// amarillo / rojo). Por eso cada celda modificada recibe primero su propia
+// copia del estilo.
+// ------------------------------------------------------------
+const RED_COLOR = { argb: 'FFFF0000' };
+const YELLOW_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+
+function cloneStyle(style) {
+  return style ? JSON.parse(JSON.stringify(style)) : {};
+}
+
+function snapshotStyles(workbook) {
+  const snap = new Map();
+  workbook.eachSheet((ws) => {
+    ws.eachRow({ includeEmpty: true }, (row) => {
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        snap.set(`${ws.id}!${cell.address}`, JSON.stringify(cell.style || {}));
+      });
+    });
+  });
+  return snap;
+}
+
+// Devuelve los segmentos de texto enriquecido: el material nuevo en rojo
+// y el resto con la fuente original de la celda.
+function buildRichTextSegments(text, search, replacement, options, baseFont) {
+  const redFont = { ...baseFont, color: RED_COLOR };
+  if (options.exactMatch) return [{ text: replacement, font: redFont }];
+
+  const regex = new RegExp(escapeRegex(search), options.caseSensitive ? 'g' : 'gi');
+  const segments = [];
+  let last = 0;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > last) segments.push({ text: text.slice(last, match.index), font: { ...baseFont } });
+    if (replacement) segments.push({ text: replacement, font: redFont });
+    last = match.index + match[0].length;
+    if (match[0].length === 0) regex.lastIndex++;
+  }
+  if (last < text.length) segments.push({ text: text.slice(last), font: { ...baseFont } });
+  return segments;
+}
+
 function applyToWorkbook(workbook, rules, options) {
   let totalChanges = 0;
   const details = [];
+  const changedKeys = new Set();            // registro de celdas realmente modificadas
+  const originalStyles = snapshotStyles(workbook);
 
   workbook.eachSheet((worksheet) => {
     worksheet.eachRow({ includeEmpty: false }, (row) => {
@@ -564,9 +614,6 @@ function applyToWorkbook(workbook, rules, options) {
       const cellB = worksheet.getCell(`B${rowNum}`);
       const numValue = cellA.value != null ? String(cellA.value).trim() : '';
       const descValue = cellB.value != null ? String(cellB.value).trim() : '';
-
-      // Bandera: ¿esta fila tuvo algún cambio?
-      let rowChanged = false;
 
       row.eachCell({ includeEmpty: false }, (cell) => {
         const cellValue = cell.value;
@@ -578,17 +625,27 @@ function applyToWorkbook(workbook, rules, options) {
           if (m.matched && m.result !== cellValue) {
             const valorOriginal = cellValue;
 
-            // Cambia el valor del material
-            cell.value = m.result;
+            // 1) Estilo propio de la celda (rompe el objeto compartido)
+            cell.style = cloneStyle(cell.style);
+            const baseFont = cell.style.font ? { ...cell.style.font } : {};
 
-            // 🔴 Solo el texto en rojo (sin negritas, sin fondo, sin bordes)
-            cell.font = {
-              ...(cell.font || {}),
-              color: { argb: 'FFFF0000' }
-            };
+            // 2) Valor nuevo: solo el material sustituido en rojo
+            const segments = buildRichTextSegments(valorOriginal, rule.search, rule.replace, options, baseFont);
+            const hasPlainParts = segments.some(sg => sg.font.color !== RED_COLOR);
+            if (segments.length > 0 && hasPlainParts) {
+              cell.value = { richText: segments };
+            } else {
+              // La celda completa es el material (o texto enriquecido no aplicable):
+              // alternativa controlada, toda la celda en rojo
+              cell.value = m.result;
+              cell.font = { ...baseFont, color: RED_COLOR };
+            }
 
+            // 3) Sombreado amarillo solo en esta celda
+            cell.fill = cloneStyle(YELLOW_FILL);
+
+            changedKeys.add(`${worksheet.id}!${cell.address}`);
             totalChanges += m.count;
-            rowChanged = true;
 
             details.push({
               sheet: worksheet.name, cell: cell.address, rowNum,
@@ -599,22 +656,30 @@ function applyToWorkbook(workbook, rules, options) {
           }
         }
       });
-
-      // 🟡 Si la fila tuvo cambios, pintar TODO el fondo de la fila en amarillo
-      if (rowChanged) {
-        row.eachCell({ includeEmpty: false }, (cell) => {
-          cell.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFFFFF00' }  // amarillo puro
-          };
-        });
-      }
     });
   });
 
-  return { totalChanges, details };
+  // Verificación: ninguna celda fuera del registro puede haber cambiado de estilo.
+  // Si alguna cambió, se restaura su estilo original.
+  let restoredCells = 0;
+  workbook.eachSheet((ws) => {
+    ws.eachRow({ includeEmpty: true }, (row) => {
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        const key = `${ws.id}!${cell.address}`;
+        if (changedKeys.has(key)) return;
+        const before = originalStyles.get(key);
+        if (before !== undefined && JSON.stringify(cell.style || {}) !== before) {
+          cell.style = JSON.parse(before);
+          restoredCells++;
+        }
+      });
+    });
+  });
+  if (restoredCells > 0) console.warn(`Se restauró el estilo original de ${restoredCells} celda(s) no modificadas.`);
+
+  return { totalChanges, details, restoredCells };
 }
+
 // ============================================================
 // RESULTADOS
 // ============================================================
