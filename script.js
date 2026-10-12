@@ -1,6 +1,8 @@
 /**
  * Sustituidor de Materiales Excel
  * Procesamiento 100% local con ExcelJS
+ *
+ * Resalta en amarillo las filas modificadas y en rojo las celdas que cambiaron.
  */
 
 // ============================================================
@@ -528,7 +530,6 @@ async function applyReplacements() {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
 
-      // ✅ AHORA CONSERVA EL NOMBRE ORIGINAL
       const outputName = fileEntry.file.name;
 
       results.push({
@@ -554,6 +555,7 @@ async function applyReplacements() {
 function applyToWorkbook(workbook, rules, options) {
   let totalChanges = 0;
   const details = [];
+
   workbook.eachSheet((worksheet) => {
     worksheet.eachRow({ includeEmpty: false }, (row) => {
       const rowNum = row.number;
@@ -561,26 +563,66 @@ function applyToWorkbook(workbook, rules, options) {
       const cellB = worksheet.getCell(`B${rowNum}`);
       const numValue = cellA.value != null ? String(cellA.value).trim() : '';
       const descValue = cellB.value != null ? String(cellB.value).trim() : '';
+
+      const changedCellsInRow = [];
+
       row.eachCell({ includeEmpty: false }, (cell) => {
         const cellValue = cell.value;
         if (typeof cellValue !== 'string') return;
         if (cell.col === 1 || cell.col === 2) return;
+
         for (const rule of rules) {
           const m = findMatchWithReplacement(cellValue, rule.search, rule.replace, options);
           if (m.matched && m.result !== cellValue) {
+            const valorOriginal = cellValue;
+
             cell.value = m.result;
             totalChanges += m.count;
+
+            // 🔴 Celda modificada: texto rojo + negrita + fondo rojo claro
+            cell.font = {
+              ...(cell.font || {}),
+              color: { argb: 'FFFF0000' },
+              bold: true
+            };
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFFFC7CE' }
+            };
+            cell.border = {
+              top:    { style: 'thin', color: { argb: 'FFFF9999' } },
+              left:   { style: 'thin', color: { argb: 'FFFF9999' } },
+              bottom: { style: 'thin', color: { argb: 'FFFF9999' } },
+              right:  { style: 'thin', color: { argb: 'FFFF9999' } }
+            };
+
+            changedCellsInRow.push(cell.address);
+
             details.push({
               sheet: worksheet.name, cell: cell.address, rowNum,
               itemNum: numValue, itemDesc: descValue,
-              original: cellValue, replaced: m.result, rule: rule.search
+              original: valorOriginal, replaced: m.result, rule: rule.search
             });
             break;
           }
         }
       });
+
+      // 🟡 Toda la fila que tuvo cambios: fondo amarillo
+      if (changedCellsInRow.length > 0) {
+        row.eachCell({ includeEmpty: false }, (cell) => {
+          if (changedCellsInRow.includes(cell.address)) return;
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFFFFF00' }
+          };
+        });
+      }
     });
   });
+
   return { totalChanges, details };
 }
 
@@ -667,7 +709,6 @@ async function downloadToFolder() {
     for (const r of modified) {
       const targetName = r.outputName;
 
-      // Verificar si el archivo ya existe en la carpeta
       let exists = false;
       try {
         await dirHandle.getFileHandle(targetName);
