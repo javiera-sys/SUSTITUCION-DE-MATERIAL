@@ -3,15 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sustituidor de Materiales Excel</title>
+  <title>Herramientas Excel · Sustituidor y Multi-Copias</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="app-header">
-    <h1>SUSTITUIDOR DE MATERIALES EXCEL</h1>
-    <p class="subtitle">Herramienta local para reemplazar nombres de materiales preservando el formato original</p>
+    <h1>HERRAMIENTAS EXCEL</h1>
+    <p class="subtitle">Procesamiento local · Los archivos nunca salen de tu navegador</p>
+    <nav class="tab-nav" role="tablist">
+      <button class="tab-nav-btn active" role="tab" data-view="sustituidor" aria-selected="true">🔁 Sustituidor de Materiales</button>
+      <button class="tab-nav-btn" role="tab" data-view="copias" aria-selected="false">📑 Multi-Copias</button>
+    </nav>
   </header>
 
+  <!-- ===================================================== -->
+  <!-- OPCIÓN 1: SUSTITUIDOR DE MATERIALES (sin cambios)      -->
+  <!-- ===================================================== -->
+  <div id="view-sustituidor">
   <main class="app-container">
     <section class="panel" id="section-upload">
       <h2>1. Cargar Archivos Excel</h2>
@@ -93,12 +101,98 @@
       </div>
     </section>
   </main>
+  </div>
+
+  <!-- ===================================================== -->
+  <!-- OPCIÓN 2: MULTI-COPIAS EXCEL                           -->
+  <!-- ===================================================== -->
+  <div id="view-copias" class="hidden">
+  <main class="app-container">
+    <div class="mc-status-row">
+      <span class="mc-status" id="mc-api-status">Verificando compatibilidad…</span>
+      <span class="catalog-hint">🛡️ El archivo base se copia tal cual (conservación 100%)</span>
+    </div>
+
+    <div class="mc-grid">
+      <div class="mc-col-left">
+        <section class="panel">
+          <h2>1. Importar Archivo Base</h2>
+          <p class="mc-help">Selecciona el archivo Excel original. Se conservará absolutamente intacto.</p>
+          <div class="upload-zone" id="mc-dropBase">
+            <div id="mc-baseDisplay">
+              <p class="mc-icon">☁️</p>
+              <p><strong>Arrastra tu archivo aquí</strong> o</p>
+              <label for="mc-baseInput" class="btn btn-secondary">Seleccionar archivo</label>
+              <p class="hint">Soporta .xlsx, .xls, .xlsm</p>
+            </div>
+            <input type="file" id="mc-baseInput" accept=".xlsx,.xls,.xlsm" hidden>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>2. Agregar Nombres</h2>
+          <div class="mc-tabs">
+            <button class="mc-tab active" data-mc-target="mc-tab-manual">⌨️ Escribir / Pegar</button>
+            <button class="mc-tab" data-mc-target="mc-tab-file">📂 Cargar Archivo</button>
+          </div>
+
+          <div id="mc-tab-manual" class="mc-tab-content">
+            <p class="mc-help">Pega una columna desde Excel o escribe un nombre por línea.</p>
+            <textarea id="mc-textarea" rows="5" placeholder="MESA-001&#10;MESA-002&#10;MESA-003"></textarea>
+            <button id="mc-addNamesBtn" class="btn btn-primary mc-full">➕ Agregar a la lista</button>
+          </div>
+
+          <div id="mc-tab-file" class="mc-tab-content hidden">
+            <p class="mc-help">Carga un .txt, .csv o .xlsx. Se extraerán los nombres de la primera columna.</p>
+            <label for="mc-namesFileInput" class="btn btn-secondary mc-full">Seleccionar archivo de nombres</label>
+            <input type="file" id="mc-namesFileInput" accept=".txt,.csv,.xlsx,.xls" hidden>
+          </div>
+        </section>
+      </div>
+
+      <div class="mc-col-right">
+        <section class="panel mc-list-panel">
+          <div class="mc-list-head">
+            <h2>📋 Lista de Nombres</h2>
+            <div class="mc-list-tools">
+              <span class="catalog-badge">Total: <span id="mc-total">0</span></span>
+              <button id="mc-clearBtn" class="mc-link-danger" title="Limpiar lista completa">🗑️ Limpiar</button>
+            </div>
+          </div>
+
+          <div id="mc-dupWarning" class="result-card warning hidden mc-dup">
+            <span>⚠️ Se detectaron nombres duplicados.</span>
+            <button id="mc-removeDupBtn" class="btn btn-secondary btn-small">Quitar duplicados</button>
+          </div>
+
+          <div class="mc-list-box">
+            <div id="mc-empty" class="mc-empty">
+              <p class="mc-icon">📝</p>
+              <p>La lista está vacía</p>
+            </div>
+            <ul id="mc-list" class="mc-list hidden"></ul>
+          </div>
+
+          <div class="mc-generate">
+            <button id="mc-generateBtn" class="btn btn-success btn-large mc-full">📁 ELEGIR CARPETA Y GENERAR ARCHIVOS</button>
+            <p id="mc-generateHint" class="mc-help mc-center">El navegador te pedirá elegir una carpeta donde guardar todos los archivos.</p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+  </div>
+
+  <div id="mc-toasts" class="mc-toasts"></div>
 
   <footer class="app-footer">
     <p>Procesamiento 100% local · Los archivos nunca salen de tu navegador</p>
   </footer>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="script.js"></script>
+  <script src="copias.js"></script>
 </body>
 </html>
