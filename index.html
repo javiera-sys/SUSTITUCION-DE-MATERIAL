@@ -12,7 +12,7 @@
     <p class="subtitle">Procesamiento local · Los archivos nunca salen de tu navegador</p>
     <nav class="tab-nav" role="tablist">
       <button class="tab-nav-btn active" role="tab" data-view="sustituidor" aria-selected="true">🔁 Sustituidor de Materiales</button>
-      <button class="tab-nav-btn" role="tab" data-view="copias" aria-selected="false">📑 Multi-Copias</button>
+      <button class="tab-nav-btn" role="tab" data-view="copias" aria-selected="false">📑 Multi-Copias (Excel y PDF)</button>
     </nav>
   </header>
 
@@ -117,15 +117,15 @@
       <div class="mc-col-left">
         <section class="panel">
           <h2>1. Importar Archivo Base</h2>
-          <p class="mc-help">Selecciona el archivo Excel original. Se conservará absolutamente intacto.</p>
+          <p class="mc-help">Selecciona el archivo original (Excel o PDF). Se conservará absolutamente intacto.</p>
           <div class="upload-zone" id="mc-dropBase">
             <div id="mc-baseDisplay">
               <p class="mc-icon">☁️</p>
               <p><strong>Arrastra tu archivo aquí</strong> o</p>
               <label for="mc-baseInput" class="btn btn-secondary">Seleccionar archivo</label>
-              <p class="hint">Soporta .xlsx, .xls, .xlsm</p>
+              <p class="hint">Soporta .xlsx, .xls, .xlsm y .pdf</p>
             </div>
-            <input type="file" id="mc-baseInput" accept=".xlsx,.xls,.xlsm" hidden>
+            <input type="file" id="mc-baseInput" accept=".xlsx,.xls,.xlsm,.pdf" hidden>
           </div>
         </section>
 
