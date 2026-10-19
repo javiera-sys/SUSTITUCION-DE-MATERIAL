@@ -98,8 +98,8 @@
   function handleBaseFile(file) {
     if (!file) return;
     const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-    if (!['.xlsx', '.xls', '.xlsm'].includes(ext)) {
-      toast('Formato no válido. Usa .xlsx, .xls o .xlsm', 'error');
+    if (!['.xlsx', '.xls', '.xlsm', '.pdf'].includes(ext)) {
+      toast('Formato no válido. Usa .xlsx, .xls, .xlsm o .pdf', 'error');
       return;
     }
     baseFile = file;
@@ -107,7 +107,7 @@
     baseDisplay.innerHTML = '';
     const icon = document.createElement('p');
     icon.className = 'mc-icon';
-    icon.textContent = '📗';
+    icon.textContent = ext === '.pdf' ? '📕' : '📗';
     const nameEl = document.createElement('p');
     nameEl.className = 'file-name';
     nameEl.textContent = file.name;
