@@ -32,6 +32,9 @@
   // MULTI-COPIAS
   // ============================================================
   let baseFile = null;
+  // El archivo base se lee de disco UNA sola vez y queda en memoria: todas las copias
+  // (y las siguientes generaciones con otros nombres) reutilizan esos mismos bytes.
+  let baseData = null;      // Promise<{ buffer: ArrayBuffer, blob: Blob }>
   let names = [];
   const supportsDirPicker = 'showDirectoryPicker' in window;
 
@@ -91,6 +94,7 @@
   // --- Archivo base ---
   function resetBaseDisplay() {
     baseFile = null;
+    baseData = null;
     baseInput.value = '';
     baseDisplay.innerHTML = BASE_PLACEHOLDER;
   }
@@ -103,6 +107,15 @@
       return;
     }
     baseFile = file;
+    baseData = file.arrayBuffer().then((buffer) => ({
+      buffer: buffer,
+      blob: new Blob([buffer], { type: file.type || 'application/octet-stream' })
+    }));
+    baseData.catch((err) => {
+      console.error(err);
+      toast('No se pudo leer el archivo base. Vuelve a seleccionarlo.', 'error');
+      resetBaseDisplay();
+    });
 
     baseDisplay.innerHTML = '';
     const icon = document.createElement('p');
@@ -246,7 +259,7 @@
   }
 
   generateBtn.addEventListener('click', async () => {
-    if (!baseFile) {
+    if (!baseFile || !baseData) {
       toast('Primero debes importar un archivo base', 'error');
       dropBase.style.borderColor = 'var(--danger)';
       setTimeout(() => { dropBase.style.borderColor = ''; }, 1000);
@@ -264,46 +277,46 @@
     try {
       const baseExt = baseFile.name.substring(baseFile.name.lastIndexOf('.'));
       const used = new Set();
+      const data = await baseData;   // ya en memoria: no se vuelve a leer de disco
+      let res;
 
       if (supportsDirPicker) {
-        let dirHandle;
-        try {
-          dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-        } catch (err) {
-          if (err.name === 'AbortError') { toast('Selección de carpeta cancelada', 'warning'); return; }
-          throw err;
-        }
-        let ok = 0;
-        const failed = [];
-        for (const name of names) {
-          const finalName = uniqueName(name, baseExt, used);
-          try {
-            const fh = await dirHandle.getFileHandle(finalName, { create: true });
-            const w = await fh.createWritable();
-            await w.write(baseFile);
-            await w.close();
-            ok++;
-          } catch (fileErr) {
-            console.error('Error escribiendo ' + finalName, fileErr);
-            failed.push(finalName);
-          }
-        }
-        if (failed.length) toast('Se guardaron ' + ok + ' archivos; fallaron ' + failed.length, 'warning', 5000);
-        else toast('¡Éxito! Se guardaron ' + ok + ' archivos en la carpeta.');
+        // Carpeta elegida por el usuario; pregunta antes de sustituir archivos existentes.
+        const items = names.map((name) => ({ name: uniqueName(name, baseExt, used), blob: data.blob }));
+        res = await Guardado.saveFiles(items, {
+          onProgress: (done, total) => { generateBtn.textContent = '⏳ GUARDANDO ' + done + '/' + total + '...'; }
+        });
       } else {
+        // Respaldo: un único ZIP. Los .xlsx/.pdf ya vienen comprimidos, así que se
+        // guardan sin recomprimir (STORE): mucho más rápido y el mismo tamaño práctico.
         generateBtn.textContent = '🗜️ EMPAQUETANDO ZIP...';
+        const bytes = new Uint8Array(data.buffer);
         const zip = new JSZip();
-        names.forEach((name) => zip.file(uniqueName(name, baseExt, used), baseFile));
-        const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+        names.forEach((name) => zip.file(uniqueName(name, baseExt, used), bytes, { binary: true }));
+        const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
         const baseName = baseFile.name.substring(0, baseFile.name.lastIndexOf('.'));
         const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'Copias_' + baseName + '_' + dateStr + '.zip';
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 100);
-        toast('¡Éxito! Se generó el ZIP con ' + names.length + ' archivos.');
+        res = await Guardado.saveFiles(
+          [{ name: 'Copias_' + baseName + '_' + dateStr + '.zip', blob: blob }],
+          { prefer: 'single' }
+        );
+      }
+
+      if (res.cancelled && res.saved === 0 && res.errors.length === 0) {
+        toast('Descarga cancelada', 'warning');
+      } else if (res.errors.length) {
+        console.error(res.errors);
+        toast('Se guardaron ' + res.saved + ' archivos; fallaron ' + res.errors.length, 'warning', 6000);
+      } else if (res.mode === 'folder') {
+        let msg = '¡Éxito! Se guardaron ' + res.saved + ' archivos en la carpeta.';
+        if (res.replaced) msg += ' Sustituidos: ' + res.replaced + '.';
+        if (res.renamed) msg += ' Con otro nombre: ' + res.renamed + '.';
+        if (res.skipped) msg += ' Omitidos: ' + res.skipped + '.';
+        toast(msg, 'success', 5000);
+      } else if (res.saved > 0) {
+        toast(supportsDirPicker ? '¡Éxito! Archivo guardado.' : '¡Éxito! Se generó el ZIP con ' + names.length + ' archivos.');
+      } else {
+        toast('No se guardó ningún archivo', 'warning');
       }
     } catch (err) {
       console.error(err);
