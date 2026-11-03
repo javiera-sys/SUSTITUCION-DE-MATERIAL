@@ -69,6 +69,13 @@ const state = {
   ruleIdCounter: 0
 };
 
+// Cachés para no repetir trabajo:
+//  - bufferCache: bytes de cada archivo ya leído (evita releer de disco en Analizar → Aplicar)
+//  - outputCache: resultado ya generado por archivo; si archivo + reglas + opciones no cambian,
+//    "Aplicar" reutiliza el Excel procesado sin volver a parsearlo ni a escribirlo.
+const bufferCache = new WeakMap();
+const outputCache = new Map();
+
 // ============================================================
 // REFERENCIAS DOM
 // ============================================================
@@ -217,7 +224,11 @@ async function exportCatalog() {
     });
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    downloadBlob(blob, 'NOMENCLATURA_DE_MATERIALES_ACTUALIZADO.xlsx');
+    const res = await Guardado.saveFiles(
+      [{ name: 'NOMENCLATURA_DE_MATERIALES_ACTUALIZADO.xlsx', blob }],
+      { prefer: 'single' }
+    );
+    reportSave(res);
   } catch (err) {
     console.error(err);
     alert('Error al exportar: ' + (err.message || err));
@@ -264,6 +275,7 @@ function addFiles(files) {
 }
 
 function removeFile(id) {
+  outputCache.delete(id);
   state.files = state.files.filter(f => f.id !== id);
   renderFileList();
   updateButtonStates();
@@ -337,7 +349,11 @@ function updateButtonStates() {
 // LECTURA
 // ============================================================
 async function readWorkbook(file) {
-  const arrayBuffer = await file.arrayBuffer();
+  let arrayBuffer = bufferCache.get(file);
+  if (!arrayBuffer) {
+    arrayBuffer = await file.arrayBuffer();
+    bufferCache.set(file, arrayBuffer);
+  }
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(arrayBuffer);
   return workbook;
@@ -509,22 +525,36 @@ async function applyReplacements() {
   showProgress('Aplicando sustituciones...', 0);
   const results = [];
   const total = state.files.length;
+  const options = {
+    caseSensitive: caseSensitiveCheck.checked,
+    exactMatch: exactMatchCheck.checked
+  };
+  const rulesSig = JSON.stringify(state.rules.map(r => [r.search, r.replace]));
 
   for (let i = 0; i < total; i++) {
     const fileEntry = state.files[i];
     updateProgress(`Procesando: ${fileEntry.file.name}`, (i / total) * 100);
+
+    // Misma entrada (archivo + reglas + opciones) → se reutiliza el resultado ya generado
+    const key = [fileEntry.file.name, fileEntry.file.size, fileEntry.file.lastModified,
+      rulesSig, options.caseSensitive, options.exactMatch].join('|');
+    const cached = outputCache.get(fileEntry.id);
+    if (cached && cached.key === key) {
+      results.push(cached.result);
+      continue;
+    }
+
     try {
       const workbook = await readWorkbook(fileEntry.file);
-      const applyResult = applyToWorkbook(workbook, state.rules, {
-        caseSensitive: caseSensitiveCheck.checked,
-        exactMatch: exactMatchCheck.checked
-      });
+      const applyResult = applyToWorkbook(workbook, state.rules, options);
 
       if (applyResult.totalChanges === 0) {
-        results.push({
+        const r = {
           fileName: fileEntry.file.name, status: 'no_changes',
           changes: 0, outputName: null, blob: null, error: null, details: []
-        });
+        };
+        results.push(r);
+        outputCache.set(fileEntry.id, { key, result: r });
         continue;
       }
 
@@ -535,11 +565,13 @@ async function applyReplacements() {
 
       const outputName = fileEntry.file.name;
 
-      results.push({
+      const r = {
         fileName: fileEntry.file.name, status: 'modified',
         changes: applyResult.totalChanges, outputName, blob,
         error: null, details: applyResult.details
-      });
+      };
+      results.push(r);
+      outputCache.set(fileEntry.id, { key, result: r });
     } catch (err) {
       results.push({
         fileName: fileEntry.file.name, status: 'error',
@@ -762,10 +794,13 @@ function renderResults(results) {
   `;
 
   let detailsHtml = '';
-  results.forEach(r => {
+  results.forEach((r, idx) => {
     if (r.status === 'modified') {
       detailsHtml += `<div class="result-card success">
-        <strong>${escapeHtml(r.fileName)}</strong> → <code>${escapeHtml(r.outputName)}</code>
+        <strong>${escapeHtml(r.fileName)}</strong> →
+        <input type="text" class="gd-name-input" data-result-index="${idx}" value="${escapeHtmlAttr(r.outputName)}"
+               aria-label="Nombre del archivo de salida"
+               title="Puedes cambiar el nombre: el archivo ya está procesado y no se vuelve a generar">
         <br><small>${r.changes} sustitución(es) realizada(s)</small>
       </div>`;
     } else if (r.status === 'no_changes') {
@@ -794,88 +829,49 @@ function supportsDirectoryPicker() {
   return typeof window.showDirectoryPicker === 'function';
 }
 
+function reportSave(res) {
+  if (!res || res.mode === 'none') return;
+  if (res.cancelled && res.saved === 0 && res.errors.length === 0) return; // cancelado: sin mensaje
+
+  if (res.mode === 'download') {
+    if (res.saved > 0) alert(`Se enviaron ${res.saved} archivo(s) a la carpeta de descargas del navegador.`);
+    return;
+  }
+
+  let msg = `✅ ${res.saved} archivo(s) guardado(s).`;
+  if (res.replaced > 0) msg += `\n\n🔁 ${res.replaced} archivo(s) sustituido(s) con tu autorización.`;
+  if (res.renamed > 0) msg += `\n\n✏️ ${res.renamed} archivo(s) guardado(s) con otro nombre (el existente se conservó).`;
+  if (res.skipped > 0) msg += `\n\n⏭️ ${res.skipped} archivo(s) omitido(s).`;
+  if (res.errors.length > 0) msg += `\n\n⚠️ Errores:\n${res.errors.join('\n')}`;
+  alert(msg);
+}
+
+function getModifiedItems() {
+  if (!state.processedResults) return [];
+  return state.processedResults
+    .filter(r => r.status === 'modified')
+    .map(r => ({ name: r.outputName, blob: r.blob }));
+}
+
+// Carpeta elegida por el usuario; pregunta antes de sustituir cualquier archivo existente.
 async function downloadToFolder() {
-  if (!state.processedResults) return;
-  const modified = state.processedResults.filter(r => r.status === 'modified');
-  if (modified.length === 0) {
+  const items = getModifiedItems();
+  if (items.length === 0) {
     alert('No hay archivos modificados para guardar.');
     return;
   }
-
-  if (!supportsDirectoryPicker()) {
-    const usarFallback = confirm(
-      'Tu navegador no permite elegir una carpeta de destino.\n\n' +
-      '¿Quieres descargar los archivos uno por uno en la carpeta de descargas por defecto?'
-    );
-    if (usarFallback) downloadIndividualFiles();
-    return;
-  }
-
-  try {
-    const dirHandle = await window.showDirectoryPicker({
-      mode: 'readwrite',
-      startIn: 'downloads'
-    });
-
-    let saved = 0;
-    let skipped = 0;
-    const errors = [];
-
-    for (const r of modified) {
-      const targetName = r.outputName;
-
-      let exists = false;
-      try {
-        await dirHandle.getFileHandle(targetName);
-        exists = true;
-      } catch (e) { /* No existe */ }
-
-      if (exists) {
-        const respuesta = confirm(
-          `Ya existe un archivo llamado "${targetName}" en la carpeta seleccionada.\n\n` +
-          `¿Deseas sobrescribirlo?\n\n` +
-          `Aceptar = Sí, sobrescribir\n` +
-          `Cancelar = No, omitir este archivo`
-        );
-        if (!respuesta) {
-          skipped++;
-          continue;
-        }
-      }
-
-      try {
-        const fileHandle = await dirHandle.getFileHandle(targetName, { create: true });
-        const writable = await fileHandle.createWritable();
-        await writable.write(r.blob);
-        await writable.close();
-        saved++;
-      } catch (err) {
-        errors.push(`${targetName}: ${err.message}`);
-      }
-    }
-
-    let msg = `✅ ${saved} archivo(s) guardado(s) en la carpeta seleccionada.`;
-    if (skipped > 0) msg += `\n\n⏭️ ${skipped} archivo(s) omitido(s) (ya existían).`;
-    if (errors.length > 0) msg += `\n\n⚠️ Errores:\n${errors.join('\n')}`;
-    alert(msg);
-  } catch (err) {
-    if (err.name === 'AbortError') return;
-    console.error(err);
-    alert('No se pudo guardar en la carpeta seleccionada: ' + err.message);
-  }
+  reportSave(await Guardado.saveFiles(items));
 }
 
-function downloadIndividualFiles() {
-  if (!state.processedResults) return;
-  const modified = state.processedResults.filter(r => r.status === 'modified');
-  if (modified.length === 0) {
+// Archivo por archivo con la ventana "Guardar como" del navegador
+// (el navegador pregunta si se reemplaza uno existente).
+async function downloadIndividualFiles() {
+  const items = getModifiedItems();
+  if (items.length === 0) {
     alert('No hay archivos modificados para descargar.');
     return;
   }
-  modified.forEach((r, idx) => {
-    setTimeout(() => downloadBlob(r.blob, r.outputName), idx * 300);
-  });
-  alert(`Se están descargando ${modified.length} archivo(s). Revisa tu carpeta de descargas.`);
+  reportSave(await Guardado.saveFiles(items, { prefer: 'single' }));
 }
 
 function downloadReport() {
@@ -911,7 +907,8 @@ function downloadReport() {
   });
 
   const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
-  downloadBlob(blob, 'reporte_sustituciones.txt');
+  Guardado.saveFiles([{ name: 'reporte_sustituciones.txt', blob }], { prefer: 'single' })
+    .then(reportSave);
 }
 
 function downloadBlob(blob, name) {
@@ -979,6 +976,16 @@ applyBtn.addEventListener('click', applyReplacements);
 downloadFolderBtn.addEventListener('click', downloadToFolder);
 downloadIndividualBtn.addEventListener('click', downloadIndividualFiles);
 downloadReportBtn.addEventListener('click', downloadReport);
+resultsDetails.addEventListener('change', (e) => {
+  const input = e.target;
+  if (!input.classList || !input.classList.contains('gd-name-input') || !state.processedResults) return;
+  const r = state.processedResults[Number(input.dataset.resultIndex)];
+  if (!r) return;
+  let name = Guardado.cleanName(input.value) || r.fileName;
+  if (!/\.xlsx$/i.test(name)) name += '.xlsx';
+  r.outputName = name;   // solo cambia el nombre; el blob ya generado se reutiliza
+  input.value = name;
+});
 catalogInput.addEventListener('change', (e) => {
   const f = e.target.files[0];
   if (f) importCatalogFromFile(f);
