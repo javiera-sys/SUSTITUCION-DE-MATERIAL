@@ -377,3 +377,37 @@ body {
 .mc-toast.success { border-left-color: var(--success); }
 .mc-toast.error { border-left-color: var(--danger); }
 .mc-toast.warning { border-left-color: #f59e0b; }
+
+/* ============================================================
+   GUARDADO DE ARCHIVOS (confirmación de reemplazo)
+   ============================================================ */
+.gd-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(15,23,42,0.55);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+}
+.gd-modal {
+  background: var(--panel-bg); border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  padding: 1.25rem; width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto;
+}
+.gd-title { font-size: 1rem; margin-bottom: 0.75rem; }
+.gd-text { font-size: 0.85rem; margin-bottom: 0.5rem; word-break: break-word; }
+.gd-input {
+  width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border);
+  border-radius: 6px; font-size: 0.85rem; margin-top: 0.25rem;
+}
+.gd-input:focus {
+  outline: none; border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+}
+.gd-error { color: var(--danger); font-size: 0.78rem; min-height: 1.1em; margin: 0.25rem 0; }
+.gd-check { margin: 0.5rem 0; }
+.gd-actions { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem; }
+.gd-actions .btn { width: 100%; text-align: center; }
+.gd-name-input {
+  padding: 0.2rem 0.5rem; border: 1px solid var(--border); border-radius: 4px;
+  font-size: 0.8rem; font-family: 'Consolas', 'Monaco', monospace;
+  width: min(100%, 360px); background: #fff;
+}
+.gd-name-input:focus { outline: none; border-color: var(--primary); }
