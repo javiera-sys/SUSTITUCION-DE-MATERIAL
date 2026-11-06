@@ -51,7 +51,8 @@ const DEFAULT_CATALOG = [
   { num: 38, material: 'REC. PINO',                  tipo: 'PT',   detalles: '' },
   { num: 39, material: 'REC. MELINA',                tipo: 'PT',   detalles: '' },
   { num: 41, material: 'TRIPLAY PINO 12MM',          tipo: 'PT',   detalles: '' },
-  { num: 42, material: 'MULTIMADERA',                tipo: 'PT',   detalles: 'DESCRIBIR QUE MATERIAL SON' }
+  { num: 42, material: 'TRIPLAY PAROTA SLICER 9MM',  tipo: 'PT',   detalles: '' },
+  { num: 43, material: 'MULTIMADERA',                tipo: 'PT',   detalles: 'DESCRIBIR QUE MATERIAL SON' }
 ];
 
 const STORAGE_KEY = 'sustituidor_catalogo_materiales_v1';
